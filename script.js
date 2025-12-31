@@ -1097,12 +1097,276 @@ async function generateFinancialReport() {
   }
 }
 
-function showStockReport() {
-  showNotification("Laporan Stok sedang dalam pengembangan", "info");
+async function showStockReport() {
+  showModal("stockReportModal");
+  await generateStockReport();
 }
 
-function showTechnicianReport() {
-  showNotification("Laporan Teknisi sedang dalam pengembangan", "info");
+async function generateStockReport() {
+  const resultsDiv = document.getElementById("stockReportResults");
+  resultsDiv.innerHTML =
+    "<p style='text-align: center; padding: 20px;'>Memuat data stok...</p>";
+
+  try {
+    const { data: items, error } = await db
+      .from("inventory")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+
+    const lowStockItems = items.filter((item) => item.stock <= item.min_stock);
+    const totalValue = items.reduce(
+      (acc, item) => acc + (parseFloat(item.sell_price) * item.stock || 0),
+      0
+    );
+
+    let html = `
+      <div class="stats-grid" style="margin-bottom: 30px;">
+        <div class="stat-card">
+          <div class="stat-value">${items.length}</div>
+          <div class="stat-label">Total Item</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value text-danger">${lowStockItems.length}</div>
+          <div class="stat-label">Stok Menipis</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${formatCurrency(totalValue)}</div>
+          <div class="stat-label">Nilai Persediaan (Jual)</div>
+        </div>
+      </div>
+
+      <h4>Daftar Barang & Inventaris</h4>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Kode</th>
+              <th>Nama Barang</th>
+              <th>Kategori</th>
+              <th>Stok</th>
+              <th>Min. Stok</th>
+              <th>Harga Jual</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    items.forEach((item) => {
+      const isLow = item.stock <= item.min_stock;
+      html += `
+        <tr>
+          <td>${item.part_code}</td>
+          <td>${item.name}</td>
+          <td><span class="badge Lunas">${item.category}</span></td>
+          <td>${item.stock}</td>
+          <td>${item.min_stock}</td>
+          <td>${formatCurrency(item.sell_price)}</td>
+          <td>
+            <span class="badge ${isLow ? "Menunggu" : "Lunas"}">
+              ${isLow ? "Stok Rendah" : "Aman"}
+            </span>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table></div>`;
+    resultsDiv.innerHTML = html;
+    window.lastStockReportData = items;
+  } catch (error) {
+    showNotification("Gagal memuat laporan stok", "error");
+    console.error("Generate Stock Report error:", error);
+  }
+}
+
+function exportStockReport() {
+  const items = window.lastStockReportData;
+  if (!items || items.length === 0) {
+    showNotification("Tidak ada data untuk diekspor", "warning");
+    return;
+  }
+
+  const csvRows = [
+    [
+      "Kode",
+      "Nama Barang",
+      "Kategori",
+      "Stok",
+      "Min Stok",
+      "Harga Jual",
+      "Status",
+    ],
+  ];
+
+  items.forEach((item) => {
+    csvRows.push([
+      item.part_code,
+      item.name,
+      item.category,
+      item.stock,
+      item.min_stock,
+      item.sell_price,
+      item.stock <= item.min_stock ? "Stok Rendah" : "Aman",
+    ]);
+  });
+
+  const csvContent = csvRows.map((e) => e.join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute(
+    "download",
+    `Laporan_Stok_${new Date().toISOString().split("T")[0]}.csv`
+  );
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function showTechnicianReport() {
+  showModal("technicianReportModal");
+  // Set default dates to current month
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .split("T")[0];
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    .toISOString()
+    .split("T")[0];
+
+  document.getElementById("techReportStartDate").value = firstDay;
+  document.getElementById("techReportEndDate").value = lastDay;
+
+  await generateTechnicianReport();
+}
+
+async function generateTechnicianReport() {
+  const startDate = document.getElementById("techReportStartDate").value;
+  const endDate = document.getElementById("techReportEndDate").value;
+  const resultsDiv = document.getElementById("technicianReportResults");
+  resultsDiv.innerHTML =
+    "<p style='text-align: center; padding: 20px;'>Menganalisis performa teknisi...</p>";
+
+  try {
+    let query = db
+      .from("work_orders")
+      .select("*, profiles!work_orders_technician_id_fkey(*)");
+
+    if (startDate) query = query.gte("date_in", startDate);
+    if (endDate) query = query.lte("date_in", endDate);
+
+    const { data: orders, error } = await query;
+    if (error) throw error;
+
+    // Group by technician
+    const techStats = {};
+    orders.forEach((o) => {
+      const tech = o.profiles;
+      const techId = tech ? tech.id : "unassigned";
+      const techName = tech ? tech.full_name : "Tanpa Teknisi";
+
+      if (!techStats[techId]) {
+        techStats[techId] = {
+          name: techName,
+          jobs: 0,
+          revenue: 0,
+          completed: 0,
+        };
+      }
+
+      techStats[techId].jobs++;
+      techStats[techId].revenue += parseFloat(o.total_cost) || 0;
+      if (o.status === "Selesai" || o.status === "Diambil") {
+        techStats[techId].completed++;
+      }
+    });
+
+    const statsArray = Object.values(techStats).sort(
+      (a, b) => b.revenue - a.revenue
+    );
+
+    let html = `
+      <div class="table-responsive" style="margin-top: 20px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nama Teknisi</th>
+              <th style="text-align: center;">Jumlah Order</th>
+              <th style="text-align: center;">Selesai</th>
+              <th style="text-align: right;">Total Pendapatan</th>
+              <th style="text-align: right;">Rata-rata/Order</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    statsArray.forEach((s) => {
+      const avg = s.jobs > 0 ? s.revenue / s.jobs : 0;
+      html += `
+        <tr>
+          <td><strong>${s.name}</strong></td>
+          <td style="text-align: center;">${s.jobs}</td>
+          <td style="text-align: center;">${s.completed}</td>
+          <td style="text-align: right;">${formatCurrency(s.revenue)}</td>
+          <td style="text-align: right;">${formatCurrency(avg)}</td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table></div>`;
+    resultsDiv.innerHTML = html;
+    window.lastTechReportData = statsArray;
+  } catch (error) {
+    showNotification("Gagal memuat laporan teknisi", "error");
+    console.error("Generate Tech Report error:", error);
+  }
+}
+
+function exportTechnicianReport() {
+  const stats = window.lastTechReportData;
+  if (!stats || stats.length === 0) {
+    showNotification("Tidak ada data untuk diekspor", "warning");
+    return;
+  }
+
+  const csvRows = [
+    [
+      "Nama Teknisi",
+      "Jumlah Order",
+      "Selesai",
+      "Total Pendapatan",
+      "Rata-rata per Order",
+    ],
+  ];
+
+  stats.forEach((s) => {
+    csvRows.push([
+      s.name,
+      s.jobs,
+      s.completed,
+      s.revenue,
+      s.jobs > 0 ? s.revenue / s.jobs : 0,
+    ]);
+  });
+
+  const csvContent = csvRows.map((e) => e.join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute(
+    "download",
+    `Laporan_Teknisi_${new Date().toISOString().split("T")[0]}.csv`
+  );
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function exportFinancialReport() {

@@ -548,6 +548,79 @@
       </div>
     </div>
 
+    <!-- Stock Report Modal -->
+    <div class="modal" id="stockReportModal">
+      <div class="modal-content" style="max-width: 1000px; max-height: 90vh">
+        <div class="modal-header">
+          <h3>Laporan Stok & Inventaris</h3>
+          <button class="close-modal" data-modal="stockReportModal">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row" style="margin-bottom: 20px">
+            <div class="form-group" style="align-self: flex-end">
+              <button class="btn btn-primary" onclick="generateStockReport()">
+                <i class="fas fa-sync"></i> Refresh Data
+              </button>
+              <button
+                class="btn"
+                onclick="exportStockReport()"
+                style="margin-left: 10px"
+              >
+                <i class="fas fa-download"></i> Export
+              </button>
+            </div>
+          </div>
+          <div id="stockReportResults">
+            <!-- Hasil laporan stok -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technician Report Modal -->
+    <div class="modal" id="technicianReportModal">
+      <div class="modal-content" style="max-width: 1000px; max-height: 90vh">
+        <div class="modal-header">
+          <h3>Laporan Performa Teknisi</h3>
+          <button class="close-modal" data-modal="technicianReportModal">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tanggal Mulai</label>
+              <input type="date" id="techReportStartDate" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label>Tanggal Akhir</label>
+              <input type="date" id="techReportEndDate" class="form-control" />
+            </div>
+            <div class="form-group" style="align-self: flex-end">
+              <button
+                class="btn btn-primary"
+                onclick="generateTechnicianReport()"
+              >
+                <i class="fas fa-chart-bar"></i> Generate
+              </button>
+              <button
+                class="btn"
+                onclick="exportTechnicianReport()"
+                style="margin-left: 10px"
+              >
+                <i class="fas fa-download"></i> Export
+              </button>
+            </div>
+          </div>
+          <div id="technicianReportResults">
+            <!-- Hasil laporan teknisi -->
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Invoice Modal -->
     <!-- Invoice Modal -->
     <div class="modal" id="invoiceModal">
