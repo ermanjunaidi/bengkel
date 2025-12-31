@@ -128,6 +128,30 @@ function unmaskCurrency(value) {
   return parseFloat(value.replace(/\./g, "")) || 0;
 }
 
+function transformImageUrl(url) {
+  if (!url) return null;
+  let directUrl = url.trim();
+
+  // Google Drive
+  if (directUrl.includes("drive.google.com")) {
+    const match = directUrl.match(/\/d\/([^\/]+)/);
+    if (match) return `https://drive.google.com/uc?id=${match[1]}`;
+  }
+
+  // Imgur
+  if (directUrl.includes("imgur.com") && !directUrl.includes("i.imgur.com")) {
+    const id = directUrl.split("/").pop().split(".")[0];
+    return `https://i.imgur.com/${id}.jpg`;
+  }
+
+  // Dropbox
+  if (directUrl.includes("dropbox.com")) {
+    return directUrl.replace("?dl=0", "?raw=1");
+  }
+
+  return directUrl;
+}
+
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.add("show");
@@ -1626,11 +1650,12 @@ async function loadPublicPosts() {
         .map(
           (post) => `
         <div class="post-card">
-          ${
-            post.image_url
-              ? `<img src="${post.image_url}" class="post-image" alt="${post.title}">`
-              : ""
-          }
+          ${(() => {
+            const transformed = transformImageUrl(post.image_url);
+            return transformed
+              ? `<img src="${transformed}" class="post-image" alt="${post.title}">`
+              : "";
+          })()}
           <div class="post-body">
             <div class="post-date">${new Date(
               post.created_at
@@ -1780,10 +1805,10 @@ async function submitPost() {
     const postData = {
       title,
       content,
-      image_url: imageUrl,
+      image_url: transformImageUrl(imageUrl),
       is_public: isPublic,
-      author_id: currentUser.id,
-      updated_at: new Date(),
+      author_id: currentUser ? currentUser.id : null,
+      updated_at: new Date().toISOString(),
     };
 
     let error;
@@ -1798,7 +1823,10 @@ async function submitPost() {
       error = err;
     }
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Save Post Error:", error);
+      throw error;
+    }
 
     showNotification(
       id ? "Postingan berhasil diupdate" : "Postingan berhasil dibuat",
@@ -1808,7 +1836,11 @@ async function submitPost() {
     loadPostsManagement();
     loadPublicPosts(); // Update landing page too
   } catch (err) {
-    showNotification("Gagal menyimpan postingan", "error");
+    console.error("Save post catch error:", err);
+    showNotification(
+      "Gagal menyimpan postingan. Pastikan tabel 'posts' sudah dibuat di Supabase.",
+      "error"
+    );
   }
 }
 
