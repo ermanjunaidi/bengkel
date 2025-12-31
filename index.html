@@ -155,10 +155,11 @@
           <div class="form-group">
             <label for="password">Password</label>
             <input
-              type="password"
+              type="text"
               id="password"
-              class="form-control"
+              class="form-control secure-input"
               placeholder="Masukkan password"
+              autocomplete="off"
               required
             />
           </div>
@@ -327,10 +328,11 @@
             <div class="form-group">
               <label>Password Baru (kosongkan jika tidak ingin mengubah)</label>
               <input
-                type="password"
+                type="text"
                 id="profilePassword"
-                class="form-control"
+                class="form-control secure-input"
                 placeholder="Password baru"
+                autocomplete="off"
               />
             </div>
           </form>
@@ -400,9 +402,10 @@
             <div class="form-group">
               <label>Password *</label>
               <input
-                type="password"
+                type="text"
                 id="newPassword"
-                class="form-control"
+                class="form-control secure-input"
+                autocomplete="off"
                 required
               />
             </div>
@@ -601,7 +604,7 @@
               </div>
               <div class="form-group flex-1">
                 <label>Total Biaya (Rp)</label>
-                <input type="text" id="woTotalCost" class="form-control" value="0" oninput="maskCurrency(this)">
+                <input type="text" id="woTotalCost" class="form-control" value="" oninput="maskCurrency(this)">
               </div>
             </div>
             <div class="form-row">

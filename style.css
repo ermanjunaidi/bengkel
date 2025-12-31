@@ -140,6 +140,13 @@ body {
 .form-group {
   margin-bottom: 20px;
 }
+
+/* Secure input masking to avoid browser password warnings */
+.secure-input {
+  -webkit-text-security: disc !important;
+  text-security: disc !important;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 8px;
