@@ -37,6 +37,7 @@ const PERMISSIONS = {
     settings: { view: true, edit: true },
     whatsapp: { send: true },
     financial: { view: true, export: true },
+    posts: { view: true, create: true, edit: true, delete: true },
   },
   supervisor: {
     dashboard: true,
@@ -95,6 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("loginForm").addEventListener("submit", handleLogin);
   document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+  loadPublicPosts();
   document
     .getElementById("menuToggle")
     .addEventListener("click", toggleSidebar);
@@ -275,6 +277,12 @@ function setupMenu() {
       roles: ["admin"],
     },
     {
+      icon: "fas fa-newspaper",
+      page: "posts",
+      label: "Manajemen Berita",
+      roles: ["admin"],
+    },
+    {
       icon: "fas fa-cogs",
       page: "settings",
       label: "Settings",
@@ -325,6 +333,7 @@ async function loadPage(page) {
     financial: "Laporan Keuangan",
     users: "Manajemen Pengguna",
     settings: "Pengaturan Sistem",
+    posts: "Manajemen Berita",
   };
   document.getElementById("pageTitle").textContent =
     pageTitles[page] || "Pintu Mobil Hoky";
@@ -358,6 +367,9 @@ async function loadPage(page) {
       break;
     case "settings":
       await loadSettings();
+      break;
+    case "posts":
+      await loadPostsManagement();
       break;
   }
 }
@@ -1589,5 +1601,228 @@ async function updateUser(id) {
     await loadUsersList();
   } catch (error) {
     showNotification("Gagal update user", "error");
+  }
+}
+
+/** News & Posts Functions **/
+async function loadPublicPosts() {
+  const postsGrid = document.getElementById("postsGrid");
+  const newsSection = document.getElementById("newsSection");
+  if (!postsGrid) return;
+
+  try {
+    const { data: posts, error } = await db
+      .from("posts")
+      .select("*")
+      .eq("is_public", true)
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    if (error) throw error;
+
+    if (posts && posts.length > 0) {
+      newsSection.style.display = "block";
+      postsGrid.innerHTML = posts
+        .map(
+          (post) => `
+        <div class="post-card">
+          ${
+            post.image_url
+              ? `<img src="${post.image_url}" class="post-image" alt="${post.title}">`
+              : ""
+          }
+          <div class="post-body">
+            <div class="post-date">${new Date(
+              post.created_at
+            ).toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}</div>
+            <h3 class="post-title">${post.title}</h3>
+            <p class="post-content">${post.content.substring(0, 150)}${
+            post.content.length > 150 ? "..." : ""
+          }</p>
+          </div>
+        </div>
+      `
+        )
+        .join("");
+    } else {
+      newsSection.style.display = "none";
+    }
+  } catch (err) {
+    console.error("Load public posts error:", err);
+  }
+}
+
+async function loadPostsManagement() {
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Manajemen Berita & Update</h3>
+      </div>
+      <div class="card-body">
+        <div style="margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="showPostModal()">
+            <i class="fas fa-plus"></i> Buat Postingan Baru
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Judul</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="postsTableBody">
+              <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const { data: posts, error } = await db
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("postsTableBody");
+    if (!posts || posts.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="4" style="text-align:center;">Belum ada postingan.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = posts
+      .map(
+        (post) => `
+      <tr>
+        <td>${new Date(post.created_at).toLocaleDateString("id-ID")}</td>
+        <td><strong>${post.title}</strong></td>
+        <td>
+          <span class="badge ${post.is_public ? "Lunas" : "Menunggu"}">
+            ${post.is_public ? "Publik" : "Draft"}
+          </span>
+        </td>
+        <td>
+          <div style="display:flex; gap:5px;">
+            <button class="btn btn-sm" onclick="showPostModal(${post.id})">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm text-danger" onclick="deletePost(${
+              post.id
+            })">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `
+      )
+      .join("");
+  } catch (err) {
+    showNotification("Gagal memuat daftar berita", "error");
+  }
+}
+
+async function showPostModal(id = null) {
+  const form = document.getElementById("postForm");
+  form.reset();
+  document.getElementById("postId").value = "";
+  document.getElementById("postModalTitle").textContent = "Buat Postingan Baru";
+
+  if (id) {
+    try {
+      const { data: post, error } = await db
+        .from("posts")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+
+      document.getElementById("postId").value = post.id;
+      document.getElementById("postTitle").value = post.title;
+      document.getElementById("postContent").value = post.content;
+      document.getElementById("postImageUrl").value = post.image_url || "";
+      document.getElementById("postIsPublic").checked = post.is_public;
+      document.getElementById("postModalTitle").textContent = "Edit Postingan";
+    } catch (err) {
+      showNotification("Gagal memuat data postingan", "error");
+      return;
+    }
+  }
+
+  showModal("postModal");
+}
+
+async function submitPost() {
+  const id = document.getElementById("postId").value;
+  const title = document.getElementById("postTitle").value;
+  const content = document.getElementById("postContent").value;
+  const imageUrl = document.getElementById("postImageUrl").value;
+  const isPublic = document.getElementById("postIsPublic").checked;
+
+  if (!title || !content) {
+    showNotification("Judul dan Isi Berita wajib diisi", "warning");
+    return;
+  }
+
+  try {
+    const postData = {
+      title,
+      content,
+      image_url: imageUrl,
+      is_public: isPublic,
+      author_id: currentUser.id,
+      updated_at: new Date(),
+    };
+
+    let error;
+    if (id) {
+      const { error: err } = await db
+        .from("posts")
+        .update(postData)
+        .eq("id", id);
+      error = err;
+    } else {
+      const { error: err } = await db.from("posts").insert([postData]);
+      error = err;
+    }
+
+    if (error) throw error;
+
+    showNotification(
+      id ? "Postingan berhasil diupdate" : "Postingan berhasil dibuat",
+      "success"
+    );
+    closeModal("postModal");
+    loadPostsManagement();
+    loadPublicPosts(); // Update landing page too
+  } catch (err) {
+    showNotification("Gagal menyimpan postingan", "error");
+  }
+}
+
+async function deletePost(id) {
+  if (!confirm("Apakah Anda yakin ingin menghapus postingan ini?")) return;
+
+  try {
+    const { error } = await db.from("posts").delete().eq("id", id);
+    if (error) throw error;
+
+    showNotification("Postingan berhasil dihapus", "success");
+    loadPostsManagement();
+    loadPublicPosts();
+  } catch (err) {
+    showNotification("Gagal menghapus postingan", "error");
   }
 }

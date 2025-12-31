@@ -66,6 +66,16 @@
         </div>
       </div>
 
+      <div class="section-padding" id="newsSection" style="display: none;">
+        <div class="section-title">
+          <h2>Berita & Update</h2>
+          <div class="divider"></div>
+        </div>
+        <div id="postsGrid" class="posts-grid">
+          <!-- Postingan akan di-load di sini -->
+        </div>
+      </div>
+
       <div class="section-padding" style="background: #f8fafc;">
         <div class="section-title">
           <h2>Mengapa Memilih Kami?</h2>
@@ -742,6 +752,42 @@
         <div class="modal-footer">
           <button class="btn" data-modal="newItemModal">Batal</button>
           <button class="btn btn-primary" onclick="submitNewItem()">Simpan Barang</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Post Modal (New/Edit) -->
+    <div class="modal" id="postModal">
+      <div class="modal-content" style="max-width: 600px">
+        <div class="modal-header">
+          <h3 id="postModalTitle">Buat Postingan Baru</h3>
+          <button class="close-modal" data-modal="postModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="postForm">
+            <input type="hidden" id="postId">
+            <div class="form-group">
+              <label>Judul Berita *</label>
+              <input type="text" id="postTitle" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Isi Berita *</label>
+              <textarea id="postContent" class="form-control" rows="6" required></textarea>
+            </div>
+            <div class="form-group">
+              <label>URL Gambar (Paste Link dari Imgur/Gdrive/dll)</label>
+              <input type="text" id="postImageUrl" class="form-control" placeholder="https://example.com/image.jpg">
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="postIsPublic" checked> Tampilkan ke Publik
+              </label>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal="postModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitPost()">Simpan Postingan</button>
         </div>
       </div>
     </div>
