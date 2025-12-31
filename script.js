@@ -7,6 +7,8 @@ let currentUser = null;
 let currentPage = "dashboard";
 let userPermissions = {};
 let currentWorkOrderId = null;
+let customersCache = null;
+let techniciansCache = null;
 
 // Permission Matrix
 const PERMISSIONS = {
@@ -642,6 +644,31 @@ function downloadInvoice() {
   showNotification("Fitur download PDF dalam pengembangan", "info");
 }
 
+async function downloadInvoiceAsPNG() {
+  const invoiceElement = document.getElementById("invoicePreview");
+  if (!invoiceElement) return;
+
+  try {
+    showNotification("Menyiapkan Gambar...", "info");
+    const canvas = await html2canvas(invoiceElement, {
+      scale: 2, // Kualitas lebih tinggi
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
+
+    const link = document.createElement("a");
+    link.download = `Invoice-${currentWorkOrderId}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+
+    showNotification("Gambar berhasil diunduh!", "success");
+    showNotification("Silakan kirim file ini ke WhatsApp pelanggan.", "info");
+  } catch (error) {
+    console.error("Error generating PNG:", error);
+    showNotification("Gagal membuat gambar invoice", "error");
+  }
+}
+
 async function loadUsersList() {
   try {
     const response = await fetch(`${SCRIPT_URL}?action=getAllUsers`);
@@ -809,34 +836,57 @@ async function showNewWorkOrderModal() {
   showModal("newWorkOrderModal");
   const custSelect = document.getElementById("woCustomer");
   const techSelect = document.getElementById("woTeknisi");
+
+  // Jika data sudah ada di cache, langsung gunakan
+  if (customersCache && techniciansCache) {
+    populateDropdowns(customersCache, techniciansCache);
+    return;
+  }
+
   custSelect.innerHTML = '<option value="">Memuat pelanggan...</option>';
   techSelect.innerHTML = '<option value="">Memuat teknisi...</option>';
+
   try {
-    const custRes = await fetch(`${SCRIPT_URL}?action=getCustomers`);
-    const custData = await custRes.json();
-    if (custData.success) {
-      custSelect.innerHTML = '<option value="">Pilih Pelanggan</option>';
-      custData.data.forEach((c) => {
-        const opt = document.createElement("option");
-        opt.value = c.id;
-        opt.textContent = `${c.nama} (${c.telepon})`;
-        custSelect.appendChild(opt);
-      });
-    }
-    const techRes = await fetch(`${SCRIPT_URL}?action=getAllUsers`);
-    const techData = await techRes.json();
-    if (techData.success) {
-      techSelect.innerHTML = '<option value="">Pilih Teknisi</option>';
-      techData.data
-        .filter((u) => u.role === "teknisi" || u.role === "admin")
-        .forEach((u) => {
-          const opt = document.createElement("option");
-          opt.value = u.username;
-          opt.textContent = u.nama;
-          techSelect.appendChild(opt);
-        });
-    }
-  } catch (err) {}
+    const [custRes, techRes] = await Promise.all([
+      fetch(`${SCRIPT_URL}?action=getCustomers`),
+      fetch(`${SCRIPT_URL}?action=getAllUsers`),
+    ]);
+
+    const [custData, techData] = await Promise.all([
+      custRes.json(),
+      techRes.json(),
+    ]);
+
+    if (custData.success) customersCache = custData.data;
+    if (techData.success) techniciansCache = techData.data;
+
+    populateDropdowns(customersCache, techniciansCache);
+  } catch (err) {
+    showNotification("Gagal memuat data pelanggan/teknisi", "error");
+  }
+}
+
+function populateDropdowns(customers, technicians) {
+  const custSelect = document.getElementById("woCustomer");
+  const techSelect = document.getElementById("woTeknisi");
+
+  custSelect.innerHTML = '<option value="">Pilih Pelanggan</option>';
+  customers.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = `${c.nama} (${c.telepon})`;
+    custSelect.appendChild(opt);
+  });
+
+  techSelect.innerHTML = '<option value="">Pilih Teknisi</option>';
+  technicians
+    .filter((u) => u.role === "teknisi" || u.role === "admin")
+    .forEach((u) => {
+      const opt = document.createElement("option");
+      opt.value = u.username;
+      opt.textContent = u.nama;
+      techSelect.appendChild(opt);
+    });
 }
 
 async function submitNewWorkOrder() {
@@ -899,6 +949,7 @@ async function submitNewCustomer() {
       if (
         document.getElementById("newWorkOrderModal").classList.contains("show")
       ) {
+        customersCache = null; // Reset cache agar ambil baru
         showNewWorkOrderModal(); // Refresh dropdown
       } else {
         loadCustomers();

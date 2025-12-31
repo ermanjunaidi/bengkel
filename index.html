@@ -17,6 +17,7 @@
       rel="stylesheet"
     />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -534,8 +535,29 @@
     </div>
 
     <!-- Invoice Modal -->
+    <!-- Invoice Modal -->
     <div class="modal" id="invoiceModal">
-      <!-- ... (previous invoice content) ... -->
+      <div class="modal-content" style="max-width: 800px">
+        <div class="modal-header">
+          <h3>Detail Invoice</h3>
+          <button class="close-modal" data-modal="invoiceModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="invoicePreview" class="invoice-container">
+            <!-- Isi invoice dari backend -->
+            <p style="text-align: center; padding: 20px">Memuat invoice...</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="printInvoice()">
+            <i class="fas fa-print"></i> Cetak
+          </button>
+          <button class="btn btn-success" onclick="downloadInvoiceAsPNG()">
+            <i class="fas fa-image"></i> Simpan PNG (WA)
+          </button>
+          <button class="btn" data-modal="invoiceModal">Tutup</button>
+        </div>
+      </div>
     </div>
 
     <!-- New Work Order Modal -->
