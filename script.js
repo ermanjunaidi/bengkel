@@ -168,7 +168,7 @@ function scrollToServices() {
 }
 
 function contactWhatsApp() {
-  const phone = "6281234567890"; // Ganti dengan nomor WhatsApp bengkel
+  const phone = "6285327463876"; // Ganti dengan nomor WhatsApp bengkel
   const message = encodeURIComponent(
     "Halo Pintu Mobil Hoky, saya ingin berkonsultasi mengenai perbaikan pintu mobil saya."
   );

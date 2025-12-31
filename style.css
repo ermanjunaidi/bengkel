@@ -799,6 +799,66 @@ body {
   margin-top: 50px;
 }
 
+.cta-section h3 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.contact-info-grid {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.contact-card {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 30px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 400px;
+  width: 100%;
+  transition: var(--transition);
+}
+
+.contact-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-5px);
+}
+
+.contact-card i {
+  font-size: 24px;
+  color: var(--primary-light);
+  margin-bottom: 15px;
+}
+
+.contact-card h4 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.contact-card p {
+  font-size: 15px;
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+.map-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 5px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-container iframe {
+  display: block;
+}
+
 @media (max-width: 768px) {
   .hero-content h1 {
     font-size: 32px;
