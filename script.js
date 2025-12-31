@@ -803,10 +803,21 @@ async function showInvoiceModal(orderId) {
         
         <div class="invoice-complaint">
           <h3>Keluhan</h3>
-          <p style="margin: 0; padding: 15px; background: #f8fafc; border-radius: 8px; font-size: 14px;">${
+          <p style="margin: 0; padding: 15px; background: #f8fafc; border-radius: 8px; font-size: 14px; margin-bottom: 20px;">${
             order.complaint || "-"
           }</p>
         </div>
+
+        ${
+          order.notes
+            ? `
+        <div class="invoice-spareparts">
+          <h3>Rincian Sparepart</h3>
+          <p style="margin: 0; padding: 15px; background: #fdf5e6; border-radius: 8px; font-size: 14px; white-space: pre-line; border-left: 4px solid #f59e0b;">${order.notes}</p>
+        </div>
+        `
+            : ""
+        }
         
         <table class="table" style="margin: 30px 0;">
           <thead>
@@ -1130,6 +1141,7 @@ async function showWorkOrderModal(id = null) {
 
       document.getElementById("woCustomer").value = order.customer_id;
       document.getElementById("woKeluhan").value = order.complaint;
+      document.getElementById("woSparepart").value = order.notes || "";
       document.getElementById("woStatus").value = order.status;
       document.getElementById("woTotalCost").value = order.total_cost;
       document.getElementById("woTeknisi").value =
@@ -1197,6 +1209,7 @@ async function submitWorkOrder() {
   const id = document.getElementById("woId").value;
   const customerId = document.getElementById("woCustomer").value;
   const keluhan = document.getElementById("woKeluhan").value;
+  const sparepart = document.getElementById("woSparepart").value;
   const teknisi = document.getElementById("woTeknisi").value;
   const status = document.getElementById("woStatus").value;
   const totalCost = document.getElementById("woTotalCost").value;
@@ -1218,6 +1231,7 @@ async function submitWorkOrder() {
     const data = {
       customer_id: customerId,
       complaint: keluhan,
+      notes: sparepart,
       technician_id: techProfile?.id,
       status: status,
       total_cost: parseFloat(totalCost) || 0,
