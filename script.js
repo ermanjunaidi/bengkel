@@ -78,9 +78,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("loginForm").addEventListener("submit", handleLogin);
   document.getElementById("logoutBtn").addEventListener("click", handleLogout);
-  document.getElementById("menuToggle").addEventListener("click", () => {
-    document.getElementById("sidebar").classList.toggle("show");
-  });
+  document
+    .getElementById("menuToggle")
+    .addEventListener("click", toggleSidebar);
+  document
+    .getElementById("closeSidebar")
+    .addEventListener("click", toggleSidebar);
+  document
+    .getElementById("sidebarOverlay")
+    .addEventListener("click", toggleSidebar);
 
   document.querySelectorAll(".close-modal, .btn[data-modal]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -98,6 +104,13 @@ function showModal(modalId) {
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.remove("show");
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  sidebar.classList.toggle("show");
+  overlay.classList.toggle("show");
 }
 
 async function handleLogin(e) {
@@ -249,6 +262,17 @@ function setupMenu() {
 
 async function loadPage(page) {
   currentPage = page;
+
+  // Close sidebar on mobile after selecting menu
+  if (window.innerWidth <= 992) {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    if (sidebar.classList.contains("show")) {
+      sidebar.classList.remove("show");
+      overlay.classList.remove("show");
+    }
+  }
+
   const pageTitles = {
     dashboard: "Dashboard",
     workorders: "Work Orders",

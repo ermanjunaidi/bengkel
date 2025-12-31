@@ -159,7 +159,7 @@
           id="loginMessage"
           style="margin-top: 15px; text-align: center"
         ></div>
-        <div
+        <!-- <div
           style="
             margin-top: 30px;
             text-align: center;
@@ -178,16 +178,31 @@
             <span class="role-badge role-teknisi">Teknisi</span>
             <span>teknisi / teknisi123</span>
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
 
     <!-- Dashboard -->
     <div id="dashboard" class="dashboard" style="display: none">
+      <!-- Sidebar Overlay -->
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
       <!-- Sidebar -->
       <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-          <h2><i class="fas fa-door-open"></i> Pintu Mobil Hoky</h2>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              width: 100%;
+            "
+          >
+            <h2><i class="fas fa-door-open"></i> Pintu Mobil Hoky</h2>
+            <button class="close-sidebar" id="closeSidebar">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
           <div id="userRoleBadge" style="margin-top: 10px"></div>
         </div>
         <nav class="nav-menu" id="navMenu">
@@ -522,26 +537,26 @@
         </div>
         <div class="modal-body">
           <form id="newWorkOrderForm">
-            <div class="form-row" style="display: flex; gap: 15px;">
-              <div class="form-group" style="flex: 1">
+            <div class="form-row">
+              <div class="form-group flex-1">
                 <label>Pilih Pelanggan *</label>
                 <select id="woCustomer" class="form-control" style="width: 100%" required></select>
               </div>
-              <div class="form-group" style="width: 150px">
+              <div class="form-group w-auth-btn">
                 <label>&nbsp;</label>
-                <button type="button" class="btn btn-secondary" onclick="showNewCustomerModal()" style="width: 100%">+ Baru</button>
+                <button type="button" class="btn btn-secondary w-100" onclick="showNewCustomerModal()">+ Baru</button>
               </div>
             </div>
             <div class="form-group">
               <label>Keluhan / Deskripsi Kerusakan *</label>
               <textarea id="woKeluhan" class="form-control" rows="4" placeholder="Contoh: Pintu kiri depan macet, Central lock tidak fungsi..." required></textarea>
             </div>
-            <div class="form-row" style="display: flex; gap: 15px;">
-              <div class="form-group" style="flex: 1">
+            <div class="form-row">
+              <div class="form-group flex-1">
                 <label>Teknisi Penanggung Jawab</label>
                 <select id="woTeknisi" class="form-control"></select>
               </div>
-              <div class="form-group" style="flex: 1">
+              <div class="form-group flex-1">
                 <label>Estimasi Selesai</label>
                 <input type="date" id="woEstimasi" class="form-control">
               </div>
@@ -598,22 +613,22 @@
               <label>Nama Barang *</label>
               <input type="text" id="itemName" class="form-control" required>
             </div>
-            <div class="form-row" style="display: flex; gap: 15px;">
-              <div class="form-group" style="flex: 1">
+            <div class="form-row">
+              <div class="form-group flex-1">
                 <label>Kategori</label>
                 <input type="text" id="itemCat" class="form-control" placeholder="Sparepart/Oli">
               </div>
-              <div class="form-group" style="flex: 1">
+              <div class="form-group flex-1">
                 <label>Stok Awal</label>
                 <input type="number" id="itemStok" class="form-control" value="0">
               </div>
             </div>
-            <div class="form-row" style="display: flex; gap: 15px;">
-              <div class="form-group" style="flex: 1">
+            <div class="form-row">
+              <div class="form-group flex-1">
                 <label>Harga Beli</label>
                 <input type="number" id="itemBeli" class="form-control">
               </div>
-              <div class="form-group" style="flex: 1">
+              <div class="form-group flex-1">
                 <label>Harga Jual</label>
                 <input type="number" id="itemJual" class="form-control">
               </div>
