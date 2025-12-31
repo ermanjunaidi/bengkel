@@ -103,24 +103,12 @@
               <small>Rincian biaya jelas sebelum pengerjaan.</small>
             </div>
           </div>
-          <div class="feature-item">
-            <i class="fas fa-check-circle"></i>
-            <div>
-              <div style="font-weight: 700;">Notifikasi Real-time</div>
-              <small>Update status servis via WhatsApp.</small>
-            </div>
-          </div>
         </div>
       </div>
 
       <div class="cta-section">
         <h3>Butuh Bantuan untuk Kendaraan Anda?</h3>
         <p style="margin: 20px 0; opacity: 0.8;">Hubungi kami atau datang langsung untuk konsultasi gratis.</p>
-        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px;">
-          <button class="btn btn-primary" style="background: var(--success); border: none;" onclick="contactWhatsApp()">
-            <i class="fab fa-whatsapp"></i> Chat via WhatsApp
-          </button>
-        </div>
         
         <div class="contact-info-grid">
           <div class="contact-card">
@@ -449,61 +437,6 @@
       </div>
     </div>
 
-    <!-- WhatsApp Modal -->
-    <div class="modal" id="whatsappModal">
-      <div class="modal-content" style="max-width: 600px">
-        <div class="modal-header">
-          <h3>
-            <i class="fab fa-whatsapp" style="color: #25d366"></i> Kirim
-            WhatsApp
-          </h3>
-          <button class="close-modal" data-modal="whatsappModal">
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label>Nomor Telepon</label>
-            <input
-              type="text"
-              id="whatsappPhone"
-              class="form-control"
-              placeholder="contoh: 628123456789"
-            />
-          </div>
-          <div class="form-group">
-            <label>Pilih Template</label>
-            <select
-              id="whatsappTemplate"
-              class="form-control"
-              onchange="loadWhatsAppTemplate()"
-            >
-              <option value="">Pilih template...</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Pesan</label>
-            <textarea
-              id="whatsappMessage"
-              class="form-control"
-              rows="6"
-              placeholder="Tulis pesan WhatsApp..."
-            ></textarea>
-          </div>
-          <div id="whatsappTemplatesList"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn" data-modal="whatsappModal">Batal</button>
-          <button
-            class="btn"
-            style="background: #25d366; color: white"
-            onclick="sendWhatsAppMessage()"
-          >
-            <i class="fab fa-whatsapp"></i> Kirim WhatsApp
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- Financial Report Modal -->
     <div class="modal" id="financialReportModal">

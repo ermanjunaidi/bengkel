@@ -43,7 +43,6 @@ const PERMISSIONS = {
     reports: { view: true, export: true },
     users: { view: true, create: true, edit: true, delete: true },
     settings: { view: true, edit: true },
-    whatsapp: { send: true },
     financial: { view: true, export: true },
     posts: { view: true, create: true, edit: true, delete: true },
   },
@@ -55,7 +54,6 @@ const PERMISSIONS = {
     reports: { view: true, export: true },
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: true, edit: false },
-    whatsapp: { send: true },
     financial: { view: true, export: false },
   },
   teknisi: {
@@ -66,7 +64,6 @@ const PERMISSIONS = {
     reports: { view: false, export: false },
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, edit: false },
-    whatsapp: { send: false },
     financial: { view: false, export: false },
   },
   kasir: {
@@ -77,7 +74,6 @@ const PERMISSIONS = {
     reports: { view: true, export: true },
     users: { view: false, create: false, edit: false, delete: false },
     settings: { view: false, edit: false },
-    whatsapp: { send: true },
     financial: { view: true, export: true },
   },
 };
@@ -290,14 +286,6 @@ function scrollToServices() {
   }
 }
 
-function contactWhatsApp() {
-  const phone = "6285327463876"; // Ganti dengan nomor WhatsApp bengkel
-  const message = encodeURIComponent(
-    "Halo Pintu Mobil Hoky, saya ingin berkonsultasi mengenai perbaikan pintu mobil saya."
-  );
-  window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
-}
-
 function showDashboard() {
   loginPage.style.display = "none";
   dashboard.style.display = "flex";
@@ -470,10 +458,6 @@ async function loadDashboard() {
         ? `<button class="btn btn-primary" onclick="showWorkOrderModal()"><i class="fas fa-plus"></i> Work Order Baru</button>`
         : ""
     }${
-    checkPermission("whatsapp", "send")
-      ? `<button class="btn" style="background: #25D366; color: white;" onclick="showWhatsAppModal()"><i class="fab fa-whatsapp"></i> Kirim WhatsApp</button>`
-      : ""
-  }${
     checkPermission("financial", "view")
       ? `<button class="btn btn-secondary" onclick="showFinancialReport()"><i class="fas fa-chart-line"></i> Laporan Keuangan</button>`
       : ""
@@ -906,7 +890,7 @@ async function loadFinancialPage() {
 }
 
 async function loadSettings() {
-  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Pengaturan Sistem</h3></div><div class="card-body"><form id="settingsForm"><div class="form-group"><label>Nama Bengkel</label><input type="text" name="company_name" class="form-control"></div><div class="form-group"><label>Alamat</label><textarea name="company_address" class="form-control"></textarea></div><div class="form-group"><label>Nomor Telepon</label><input type="text" name="company_phone" class="form-control"></div><div class="form-group"><label>WhatsApp API Key</label><input type="password" name="whatsapp_api_key" class="form-control"></div><button type="button" class="btn btn-primary" onclick="saveSettings()">Simpan Pengaturan</button></form></div></div>`;
+  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Pengaturan Sistem</h3></div><div class="card-body"><form id="settingsForm"><div class="form-group"><label>Nama Bengkel</label><input type="text" name="company_name" class="form-control"></div><div class="form-group"><label>Alamat</label><textarea name="company_address" class="form-control"></textarea></div><div class="form-group"><label>Nomor Telepon</label><input type="text" name="company_phone" class="form-control"></div><button type="button" class="btn btn-primary" onclick="saveSettings()">Simpan Pengaturan</button></form></div></div>`;
   try {
     const { data: settings, error } = await db.from("settings").select("*");
     if (error) throw error;
@@ -935,84 +919,6 @@ async function saveSettings() {
   } catch (error) {
     showNotification("Gagal menyimpan pengaturan", "error");
     console.error("Save Settings error:", error);
-  }
-}
-
-async function showWhatsAppModal() {
-  showModal("whatsappModal");
-  const templates = [
-    {
-      id: 1,
-      name: "Konfirmasi Work Order",
-      message:
-        "Halo, work order Anda dengan ID #{orderId} telah dibuat. Status: {status}. Terima kasih.",
-    },
-    {
-      id: 2,
-      name: "Update Status",
-      message:
-        "Halo, work order #{orderId} telah diperbarui menjadi {status}. Terima kasih.",
-    },
-    {
-      id: 3,
-      name: "Pengingat Pembayaran",
-      message:
-        "Halo, work order #{orderId} memiliki status pembayaran: {paymentStatus}. Total: Rp {total}. Terima kasih.",
-    },
-    {
-      id: 4,
-      name: "Selesai",
-      message:
-        "Halo, kendaraan Anda telah selesai diperbaiki. Silakan mengambil di bengkel. Total: Rp {total}. Terima kasih.",
-    },
-  ];
-
-  const templateSelect = document.getElementById("whatsappTemplate");
-  templateSelect.innerHTML = '<option value="">Pilih template...</option>';
-  templates.forEach((template) => {
-    const option = document.createElement("option");
-    option.value = template.id;
-    option.textContent = template.name;
-    templateSelect.appendChild(option);
-  });
-
-  const templateList = document.getElementById("whatsappTemplatesList");
-  templateList.innerHTML = "<h4>Template Tersedia:</h4>";
-  templates.forEach((template) => {
-    const div = document.createElement("div");
-    div.className = "whatsapp-template";
-    div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${template.name}</div><div style="font-size: 12px; color: #666;">${template.message}</div>`;
-    div.addEventListener("click", () => {
-      document.getElementById("whatsappMessage").value = template.message;
-    });
-    templateList.appendChild(div);
-  });
-}
-
-function loadWhatsAppTemplate() {}
-
-async function sendWhatsAppMessage() {
-  const phone = document.getElementById("whatsappPhone").value;
-  const message = document.getElementById("whatsappMessage").value;
-  if (!phone || !message) {
-    showNotification("Harap isi nomor telepon dan pesan", "error");
-    return;
-  }
-  try {
-    // Simulate sending and log to Supabase audit_log
-    const { error } = await db.from("audit_log").insert({
-      user_id: currentUser.username,
-      action: "sendWhatsApp",
-      details: `To: ${phone}, Msg: ${message}`,
-    });
-
-    if (error) throw error;
-
-    showNotification("WhatsApp berhasil dikirim (simulasi)", "success");
-    closeModal("whatsappModal");
-  } catch (error) {
-    showNotification("Gagal mengirim WhatsApp", "error");
-    console.error("Send WhatsApp error:", error);
   }
 }
 
