@@ -762,6 +762,49 @@ body {
   padding-top: 20px;
 }
 
+/* Responsive Invoice Fixes */
+@media (max-width: 576px) {
+  .invoice-container {
+    padding: 20px 15px;
+  }
+  .invoice-header .invoice-title {
+    font-size: 24px;
+    margin: 10px 0;
+  }
+  .invoice-details {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .detail-label {
+    width: 100px;
+  }
+  .signature {
+    flex-direction: column;
+    gap: 40px;
+    align-items: center;
+    padding: 0;
+  }
+  .signature-box {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+@media print {
+  .sidebar, .topbar, .notification-container, .btn, .close-modal {
+    display: none !important;
+  }
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .invoice-container {
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+
 /* Landing Page Styles */
 .landing-page {
   background: white;

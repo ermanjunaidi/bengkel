@@ -770,83 +770,81 @@ async function showInvoiceModal(orderId) {
     const companyPhone = settings.company_phone || "021-1234567";
 
     const html = `
-      <div class="invoice-content" style="font-family: Arial, sans-serif; padding: 20px; background: white; color: #333;">
-        <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
-          <div style="font-size: 24px; font-weight: bold;">${companyName}</div>
-          <div>${companyAddress}</div>
-          <div>Telp: ${companyPhone}</div>
-          <h1 style="font-size: 28px; margin: 20px 0;">INVOICE</h1>
-          <div>No: INV-${order.id}-${new Date()
+      <div class="invoice-container">
+        <div class="invoice-header">
+          <div class="company-name">${companyName}</div>
+          <div class="company-address">${companyAddress}</div>
+          <div class="company-phone">Telp: ${companyPhone}</div>
+          <h1 class="invoice-title">INVOICE</h1>
+          <div class="invoice-no">No: INV-${order.id}-${new Date()
       .toISOString()
       .slice(0, 10)
       .replace(/-/g, "")}</div>
         </div>
         
-        <div style="margin: 30px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="invoice-details">
           <div>
-            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Work Order ID:</b> <span>#${
+            <div class="detail-row"><span class="detail-label">Work Order ID:</span> <span>#${
               order.id
             }</span></div>
-            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Plat Nomor:</b> <span>${
+            <div class="detail-row"><span class="detail-label">Plat Nomor:</span> <span>${
               order.vehicles?.plate || "-"
             }</span></div>
           </div>
           <div>
-            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Tanggal:</b> <span>${new Date(
+            <div class="detail-row"><span class="detail-label">Tanggal:</span> <span>${new Date(
               order.date_in
-            ).toLocaleDateString()}</span></div>
-            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Pelanggan:</b> <span>${
+            ).toLocaleDateString("id-ID")}</span></div>
+            <div class="detail-row"><span class="detail-label">Pelanggan:</span> <span>${
               order.customers?.name || "-"
             }</span></div>
           </div>
         </div>
         
-        <div style="margin-bottom: 20px;">
-          <b style="display: block; margin-bottom: 5px;">Keluhan:</b>
-          <p style="margin: 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">${
+        <div class="invoice-complaint">
+          <h3>Keluhan</h3>
+          <p style="margin: 0; padding: 15px; background: #f8fafc; border-radius: 8px; font-size: 14px;">${
             order.complaint || "-"
           }</p>
         </div>
         
-        <table style="width: 100%; border-collapse: collapse; margin: 30px 0;">
+        <table class="table" style="margin: 30px 0;">
           <thead>
-            <tr style="background: #f4f4f4;">
-              <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Deskripsi</th>
-              <th style="border: 1px solid #ddd; padding: 12px; text-align: right;">Total</th>
+            <tr>
+              <th>Deskripsi</th>
+              <th style="text-align: right;">Total</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 12px;">Total Biaya Servis & Sparepart</td>
-              <td style="border: 1px solid #ddd; padding: 12px; text-align: right;">${formatCurrency(
+              <td>Total Biaya Servis & Sparepart</td>
+              <td style="text-align: right;">${formatCurrency(
                 order.total_cost
               )}</td>
             </tr>
           </tbody>
         </table>
         
-        <div style="text-align: right; font-size: 18px; font-weight: bold; margin-top: 30px;">
-          <div>Total: ${formatCurrency(order.total_cost)}</div>
-          <div style="font-size: 14px; color: #666; margin-top: 5px;">Status: ${
-            order.payment_status
-          }</div>
+        <div class="total">
+          Total Akhir: ${formatCurrency(order.total_cost)}
+          <div style="font-size: 13px; color: var(--secondary); font-weight: normal; margin-top: 5px;">
+            Status Pembayaran: ${order.payment_status}
+          </div>
         </div>
         
-        <div style="margin-top: 50px; display: flex; justify-content: space-between;">
-          <div style="width: 200px; text-align: center;">
+        <div class="signature">
+          <div class="signature-box">
             <div>Hormat Kami,</div>
-            <div style="border-top: 1px solid #000; margin-top: 60px;"></div>
+            <div class="signature-line"></div>
             <div>${companyName}</div>
           </div>
-          <div style="width: 200px; text-align: center;">
+          <div class="signature-box">
             <div>Pelanggan,</div>
-            <div style="border-top: 1px solid #000; margin-top: 60px;"></div>
+            <div class="signature-line"></div>
             <div>${order.customers?.name || "Nama Terang"}</div>
           </div>
         </div>
         
-        <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
-          <p>Terima kasih telah mempercayakan kendaraan Anda kepada kami.</p>
         </div>
       </div>
     `;
