@@ -1,6 +1,21 @@
-// Configuration
-const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwoVf2umtmvf1S_TzWGBf_QeBFDyf6fm5K0fZzd0A0rmHYNFfsZ0Kp4saHXxJoKVN5w/exec"; // Ganti dengan URL Web App Anda
+// Supabase Configuration
+const SUPABASE_URL = "https://lbhutmuchalhpxurcfqe.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiaHV0bXVjaGFsaHB4dXJjZnFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjU0MzgsImV4cCI6MjA4Mjc0MTQzOH0.G3e8A3ozqS50VFr_YntCKTShaR-yRZ4tyifST_f0jow";
+
+let db;
+
+try {
+  if (window.supabase) {
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else {
+    console.error(
+      "Supabase SDK not found. Please check index.html script tag."
+    );
+  }
+} catch (err) {
+  console.error("Error initializing Supabase:", err);
+}
 
 // State
 let currentUser = null;
@@ -98,6 +113,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+function formatCurrency(amount) {
+  return "Rp " + (parseFloat(amount) || 0).toLocaleString("id-ID");
+}
+
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.add("show");
@@ -119,14 +138,28 @@ async function handleLogin(e) {
   e.preventDefault();
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-  showNotification("Sedang login...", "info");
+
   try {
-    const response = await fetch(
-      `${SCRIPT_URL}?action=login&username=${username}&password=${password}`
-    );
-    const result = await response.json();
-    if (result.success) {
-      currentUser = result.user;
+    const { data: user, error } = await db
+      .from("profiles")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password)
+      .single();
+
+    if (error) {
+      showNotification("Username atau password salah", "error");
+      return;
+    }
+
+    if (user) {
+      currentUser = {
+        id: user.id,
+        username: user.username,
+        nama: user.full_name,
+        role: user.role,
+        telepon: user.phone,
+      };
       userPermissions = PERMISSIONS[currentUser.role] || PERMISSIONS.teknisi;
       localStorage.setItem("bengkel_user", JSON.stringify(currentUser));
       landingPage.style.display = "none";
@@ -134,11 +167,10 @@ async function handleLogin(e) {
       setupMenu();
       loadPage("dashboard");
       showNotification("Login berhasil!", "success");
-    } else {
-      showNotification(result.message, "error");
     }
   } catch (error) {
     showNotification("Terjadi kesalahan. Coba lagi.", "error");
+    console.error("Login error:", error);
   }
 }
 
@@ -336,7 +368,7 @@ async function loadDashboard() {
     </div>
     <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-bolt text-primary"></i> Aksi Cepat</h3></div><div class="card-body"><div style="display: flex; flex-wrap: wrap; gap: 15px;">${
       checkPermission("workorders", "create")
-        ? `<button class="btn btn-primary" onclick="showNewWorkOrderModal()"><i class="fas fa-plus"></i> Work Order Baru</button>`
+        ? `<button class="btn btn-primary" onclick="showWorkOrderModal()"><i class="fas fa-plus"></i> Work Order Baru</button>`
         : ""
     }${
     checkPermission("whatsapp", "send")
@@ -353,38 +385,56 @@ async function loadDashboard() {
 
 async function updateDashboardData() {
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getDashboardData`);
-    const result = await response.json();
-    if (result.success) {
-      const stats = result.stats;
-      document.getElementById("stat-total").textContent = stats.total;
-      document.getElementById("stat-pending").textContent = stats.pending;
-      document.getElementById("stat-progress").textContent = stats.progress;
-      document.getElementById("stat-revenue").textContent =
-        "Rp " + stats.revenue.toLocaleString();
+    // Get stats from Supabase
+    const { data: woData, error: woError } = await db
+      .from("work_orders")
+      .select("status, total_cost");
 
-      // Load recent orders
-      const ordersResponse = await fetch(`${SCRIPT_URL}?action=getWorkOrders`);
-      const ordersResult = await ordersResponse.json();
-      if (ordersResult.success) {
-        const tableBody = document.getElementById("recentOrdersTable");
-        tableBody.innerHTML = ordersResult.data
-          .slice(0, 5)
-          .map(
-            (order) =>
-              `<tr><td>#${order.ID}</td><td>${new Date(
-                order.TanggalMasuk
-              ).toLocaleDateString()}</td><td><span class="status-badge status-${order.Status.toLowerCase()}">${
-                order.Status
-              }</span></td><td>${
-                order.Teknisi
-              }</td><td>Rp ${order.TotalBiaya.toLocaleString()}</td><td><button class="btn btn-sm" onclick="showInvoiceModal(${
-                order.ID
-              })"><i class="fas fa-file-invoice"></i></button></td></tr>`
-          )
-          .join("");
-      }
-    }
+    if (woError) throw woError;
+
+    const stats = {
+      total: woData.length,
+      pending: woData.filter((wo) => wo.status === "Menunggu").length,
+      progress: woData.filter((wo) => wo.status === "Diproses").length,
+      revenue: woData.reduce(
+        (acc, wo) => acc + (parseFloat(wo.total_cost) || 0),
+        0
+      ),
+    };
+
+    document.getElementById("stat-total").textContent = stats.total;
+    document.getElementById("stat-pending").textContent = stats.pending;
+    document.getElementById("stat-progress").textContent = stats.progress;
+    document.getElementById("stat-revenue").textContent = formatCurrency(
+      stats.revenue
+    );
+
+    // Load recent orders with customer name
+    const { data: recentOrders, error: recentError } = await db
+      .from("work_orders")
+      .select("*, profiles!work_orders_technician_id_fkey(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (recentError) throw recentError;
+
+    const tableBody = document.getElementById("recentOrdersTable");
+    tableBody.innerHTML = recentOrders
+      .map(
+        (order) =>
+          `<tr><td>#${order.id}</td><td>${new Date(
+            order.date_in
+          ).toLocaleDateString()}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+            order.status
+          }</span></td><td>${
+            order.profiles?.full_name || "-"
+          }</td><td>${formatCurrency(
+            order.total_cost
+          )}</td><td><button class="btn btn-sm" onclick="showInvoiceModal(${
+            order.id
+          })"><i class="fas fa-file-invoice"></i></button></td></tr>`
+      )
+      .join("");
   } catch (error) {
     console.error("Error updating dashboard data:", error);
   }
@@ -393,85 +443,101 @@ async function updateDashboardData() {
 async function loadWorkOrders() {
   contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Manajemen Work Orders</h3></div><div class="card-body"><div style="margin-bottom: 20px;">${
     checkPermission("workorders", "create")
-      ? `<button class="btn btn-primary" onclick="showNewWorkOrderModal()"><i class="fas fa-plus"></i> Tambah Work Order</button>`
+      ? `<button class="btn btn-primary" onclick="showWorkOrderModal()"><i class="fas fa-plus"></i> Tambah Work Order</button>`
       : ""
   }</div><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Tanggal</th><th>Customer</th><th>Keluhan</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="workOrdersTable"><tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr></tbody></table></div></div></div>`;
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getWorkOrders`);
-    const result = await response.json();
-    if (result.success) {
-      const tableBody = document.getElementById("workOrdersTable");
-      tableBody.innerHTML = result.data
-        .map(
-          (order) =>
-            `<tr><td>#${order.ID}</td><td>${new Date(
-              order.TanggalMasuk
-            ).toLocaleDateString()}</td><td>${
-              order.CustomerID
-            }</td><td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
-              order.Keluhan
-            }</td><td><span class="status-badge status-${order.Status.toLowerCase()}">${
-              order.Status
-            }</span></td><td>${
-              order.Teknisi
-            }</td><td>Rp ${order.TotalBiaya.toLocaleString()}</td><td><div style="display: flex; gap: 5px;"><button class="btn btn-sm" onclick="showInvoiceModal(${
-              order.ID
-            })"><i class="fas fa-eye"></i></button><button class="btn btn-sm" onclick="editWorkOrder(${
-              order.ID
-            })"><i class="fas fa-edit"></i></button></div></td></tr>`
-        )
-        .join("");
-    }
+    const { data: orders, error } = await db
+      .from("work_orders")
+      .select(
+        "*, customers(name), profiles!work_orders_technician_id_fkey(full_name)"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tableBody = document.getElementById("workOrdersTable");
+    tableBody.innerHTML = orders
+      .map(
+        (order) =>
+          `<tr><td>#${order.id}</td><td>${new Date(
+            order.date_in
+          ).toLocaleDateString()}</td><td>${
+            order.customers?.name || "-"
+          }</td><td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
+            order.complaint || ""
+          }</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+            order.status
+          }</span></td><td>${
+            order.profiles?.full_name || "-"
+          }</td><td>${formatCurrency(
+            order.total_cost
+          )}</td><td><div style="display: flex; gap: 5px;"><button class="btn btn-sm" onclick="showInvoiceModal(${
+            order.id
+          })"><i class="fas fa-eye"></i></button><button class="btn btn-sm" onclick="showWorkOrderModal(${
+            order.id
+          })"><i class="fas fa-edit"></i></button></div></td></tr>`
+      )
+      .join("");
   } catch (error) {
     showNotification("Gagal memuat work orders", "error");
+    console.error("Load Work Orders error:", error);
   }
 }
 
 async function loadCustomers() {
-  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Daftar Pelanggan</h3></div><div class="card-body"><div style="margin-bottom: 20px;"><button class="btn btn-primary" onclick="showNewCustomerModal()"><i class="fas fa-plus"></i> Tambah Pelanggan</button></div><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Nama</th><th>Telepon</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody id="customersTable"><tr><td colspan="5" style="text-align: center;">Memuat data...</td></tr></tbody></table></div></div></div>`;
+  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Daftar Pelanggan</h3></div><div class="card-body"><div style="margin-bottom: 20px;"><button class="btn btn-primary" onclick="showCustomerModal()"><i class="fas fa-plus"></i> Tambah Pelanggan</button></div><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Nama</th><th>Telepon</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody id="customersTable"><tr><td colspan="5" style="text-align: center;">Memuat data...</td></tr></tbody></table></div></div></div>`;
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getCustomers`);
-    const result = await response.json();
-    if (result.success) {
-      document.getElementById("customersTable").innerHTML = result.data
-        .map(
-          (c) =>
-            `<tr><td>${c.id}</td><td>${c.nama}</td><td>${c.telepon}</td><td>${
-              c.alamat || "-"
-            }</td><td><button class="btn btn-sm" onclick="editCustomer(${
-              c.id
-            })"><i class="fas fa-edit"></i></button></td></tr>`
-        )
-        .join("");
-    }
+    const { data: customers, error } = await db
+      .from("customers")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+
+    document.getElementById("customersTable").innerHTML = customers
+      .map(
+        (c) =>
+          `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.phone}</td><td>${
+            c.address || "-"
+          }</td><td><button class="btn btn-sm" onclick="showCustomerModal(${
+            c.id
+          })"><i class="fas fa-edit"></i></button></td></tr>`
+      )
+      .join("");
   } catch (error) {
     showNotification("Gagal memuat daftar pelanggan", "error");
+    console.error("Load Customers error:", error);
   }
 }
 
 async function loadInventory() {
   contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Inventaris Barang</h3></div><div class="card-body"><div style="margin-bottom: 20px;"><button class="btn btn-primary" onclick="showNewItemModal()"><i class="fas fa-plus"></i> Tambah Item</button></div><div class="table-responsive"><table class="table"><thead><tr><th>Kode</th><th>Nama Barang</th><th>Kategori</th><th>Stok</th><th>Harga Jual</th><th>Aksi</th></tr></thead><tbody id="inventoryTable"></tbody></table></div></div></div>`;
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getInventory`);
-    const result = await response.json();
-    if (result.success) {
-      document.getElementById("inventoryTable").innerHTML = result.data
-        .map(
-          (item) =>
-            `<tr><td>${item.kode}</td><td>${item.nama}</td><td>${
-              item.kategori
-            }</td><td class="${
-              item.stok <= item.stokMin ? "text-danger" : ""
-            }">${
-              item.stok
-            }</td><td>Rp ${item.hargaJual.toLocaleString()}</td><td><button class="btn btn-sm" onclick="updateStock('${
-              item.id
-            }')"><i class="fas fa-plus-minus"></i></button></td></tr>`
-        )
-        .join("");
-    }
+    const { data: inventory, error } = await db
+      .from("inventory")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+
+    document.getElementById("inventoryTable").innerHTML = inventory
+      .map(
+        (item) =>
+          `<tr><td>${item.part_code}</td><td>${item.name}</td><td>${
+            item.category || "-"
+          }</td><td class="${
+            item.stock <= item.min_stock ? "text-danger" : ""
+          }">${item.stock}</td><td>${formatCurrency(
+            item.sell_price
+          )}</td><td><button class="btn btn-sm" onclick="updateStock('${
+            item.id
+          }')"><i class="fas fa-plus-minus"></i></button></td></tr>`
+      )
+      .join("");
   } catch (error) {
     showNotification("Gagal memuat inventaris", "error");
+    console.error("Load Inventory error:", error);
   }
 }
 
@@ -482,64 +548,85 @@ async function loadReports() {
 async function loadSettings() {
   contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Pengaturan Sistem</h3></div><div class="card-body"><form id="settingsForm"><div class="form-group"><label>Nama Bengkel</label><input type="text" name="company_name" class="form-control"></div><div class="form-group"><label>Alamat</label><textarea name="company_address" class="form-control"></textarea></div><div class="form-group"><label>Nomor Telepon</label><input type="text" name="company_phone" class="form-control"></div><div class="form-group"><label>WhatsApp API Key</label><input type="password" name="whatsapp_api_key" class="form-control"></div><button type="button" class="btn btn-primary" onclick="saveSettings()">Simpan Pengaturan</button></form></div></div>`;
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getSettings`);
-    const result = await response.json();
-    if (result.success) {
-      const form = document.getElementById("settingsForm");
-      for (const [key, value] of Object.entries(result.settings)) {
-        if (form.elements[key]) form.elements[key].value = value;
-      }
-    }
-  } catch (error) {}
+    const { data: settings, error } = await db.from("settings").select("*");
+    if (error) throw error;
+
+    const form = document.getElementById("settingsForm");
+    settings.forEach((s) => {
+      if (form.elements[s.key]) form.elements[s.key].value = s.value;
+    });
+  } catch (error) {
+    console.error("Load Settings error:", error);
+  }
 }
 
 async function saveSettings() {
   const form = document.getElementById("settingsForm");
   const formData = new FormData(form);
-  const params = new URLSearchParams(formData);
-  params.append("action", "updateSettings");
+  const settingsData = [];
+  formData.forEach((value, key) => {
+    settingsData.push({ key, value });
+  });
+
   try {
-    const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-    const result = await response.json();
-    if (result.success) showNotification("Pengaturan disimpan", "success");
+    const { error } = await db.from("settings").upsert(settingsData);
+    if (error) throw error;
+    showNotification("Pengaturan disimpan", "success");
   } catch (error) {
     showNotification("Gagal menyimpan pengaturan", "error");
+    console.error("Save Settings error:", error);
   }
 }
 
 async function showWhatsAppModal() {
   showModal("whatsappModal");
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=getWhatsAppTemplates`);
-    const result = await response.json();
-    if (result.success) {
-      const templateSelect = document.getElementById("whatsappTemplate");
-      templateSelect.innerHTML = '<option value="">Pilih template...</option>';
-      result.templates.forEach((template) => {
-        const option = document.createElement("option");
-        option.value = template.id;
-        option.textContent = template.name || `Template ${template.id}`;
-        templateSelect.appendChild(option);
-      });
-      const templateList = document.getElementById("whatsappTemplatesList");
-      templateList.innerHTML = "<h4>Template Tersedia:</h4>";
-      result.templates.forEach((template) => {
-        const div = document.createElement("div");
-        div.className = "whatsapp-template";
-        div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${
-          template.name || `Template ${template.id}`
-        }</div><div style="font-size: 12px; color: #666;">${
-          template.message
-        }</div>`;
-        div.addEventListener("click", () => {
-          document.getElementById("whatsappMessage").value = template.message;
-        });
-        templateList.appendChild(div);
-      });
-    }
-  } catch (error) {
-    console.error("Error loading templates:", error);
-  }
+  const templates = [
+    {
+      id: 1,
+      name: "Konfirmasi Work Order",
+      message:
+        "Halo, work order Anda dengan ID #{orderId} telah dibuat. Status: {status}. Terima kasih.",
+    },
+    {
+      id: 2,
+      name: "Update Status",
+      message:
+        "Halo, work order #{orderId} telah diperbarui menjadi {status}. Terima kasih.",
+    },
+    {
+      id: 3,
+      name: "Pengingat Pembayaran",
+      message:
+        "Halo, work order #{orderId} memiliki status pembayaran: {paymentStatus}. Total: Rp {total}. Terima kasih.",
+    },
+    {
+      id: 4,
+      name: "Selesai",
+      message:
+        "Halo, kendaraan Anda telah selesai diperbaiki. Silakan mengambil di bengkel. Total: Rp {total}. Terima kasih.",
+    },
+  ];
+
+  const templateSelect = document.getElementById("whatsappTemplate");
+  templateSelect.innerHTML = '<option value="">Pilih template...</option>';
+  templates.forEach((template) => {
+    const option = document.createElement("option");
+    option.value = template.id;
+    option.textContent = template.name;
+    templateSelect.appendChild(option);
+  });
+
+  const templateList = document.getElementById("whatsappTemplatesList");
+  templateList.innerHTML = "<h4>Template Tersedia:</h4>";
+  templates.forEach((template) => {
+    const div = document.createElement("div");
+    div.className = "whatsapp-template";
+    div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${template.name}</div><div style="font-size: 12px; color: #666;">${template.message}</div>`;
+    div.addEventListener("click", () => {
+      document.getElementById("whatsappMessage").value = template.message;
+    });
+    templateList.appendChild(div);
+  });
 }
 
 function loadWhatsAppTemplate() {}
@@ -552,20 +639,20 @@ async function sendWhatsAppMessage() {
     return;
   }
   try {
-    const response = await fetch(
-      `${SCRIPT_URL}?action=sendWhatsApp&phone=${encodeURIComponent(
-        phone
-      )}&message=${encodeURIComponent(message)}`
-    );
-    const result = await response.json();
-    if (result.success) {
-      showNotification("WhatsApp berhasil dikirim (simulasi)", "success");
-      closeModal("whatsappModal");
-    } else {
-      showNotification(result.message, "error");
-    }
+    // Simulate sending and log to Supabase audit_log
+    const { error } = await db.from("audit_log").insert({
+      user_id: currentUser.username,
+      action: "sendWhatsApp",
+      details: `To: ${phone}, Msg: ${message}`,
+    });
+
+    if (error) throw error;
+
+    showNotification("WhatsApp berhasil dikirim (simulasi)", "success");
+    closeModal("whatsappModal");
   } catch (error) {
     showNotification("Gagal mengirim WhatsApp", "error");
+    console.error("Send WhatsApp error:", error);
   }
 }
 
@@ -578,56 +665,196 @@ async function generateFinancialReport() {
   const startDate = document.getElementById("reportStartDate").value;
   const endDate = document.getElementById("reportEndDate").value;
   try {
-    let url = `${SCRIPT_URL}?action=getFinancialReport`;
-    if (startDate) url += `&startDate=${startDate}`;
-    if (endDate) url += `&endDate=${endDate}`;
-    const response = await fetch(url);
-    const result = await response.json();
-    if (result.success) {
-      const report = result.report;
-      let html = `<div style="margin: 20px 0;"><h4>Ringkasan Laporan</h4><div class="stats-grid"><div class="stat-card"><div class="stat-value">${
-        report.totalOrders
-      }</div><div class="stat-label">Total Order</div></div><div class="stat-card"><div class="stat-value">Rp ${report.totalRevenue.toLocaleString()}</div><div class="stat-label">Total Pendapatan</div></div><div class="stat-card"><div class="stat-value">Rp ${report.pendingPayment.toLocaleString()}</div><div class="stat-label">Piutang</div></div><div class="stat-card"><div class="stat-value">${report.completionRate.toFixed(
-        1
-      )}%</div><div class="stat-label">Completion Rate</div></div></div></div><div style="margin: 20px 0;"><h4>Status Pembayaran</h4><div style="display: flex; gap: 20px; flex-wrap: wrap;">`;
-      for (const [status, count] of Object.entries(report.paymentStatus)) {
-        html += `<div style="text-align: center;"><div style="font-size: 24px; font-weight: bold;">${count}</div><div style="font-size: 12px; color: #666;">${status}</div></div>`;
-      }
-      html += `</div></div><div style="margin: 20px 0;"><h4>Detail Transaksi</h4><div class="table-responsive"><table class="table"><thead><tr><th>ID Order</th><th>Tanggal</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Pembayaran</th></tr></thead><tbody>`;
-      report.details.forEach((order) => {
-        html += `<tr><td>#${order.id}</td><td>${new Date(
-          order.tanggal
-        ).toLocaleDateString(
-          "id-ID"
-        )}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
-          order.status
-        }</span></td><td>${
-          order.teknisi
-        }</td><td>Rp ${order.total.toLocaleString()}</td><td>${
-          order.pembayaran
-        }</td></tr>`;
-      });
-      html += `</tbody></table></div></div>`;
-      document.getElementById("reportResults").innerHTML = html;
+    let query = db
+      .from("work_orders")
+      .select("*, profiles!work_orders_technician_id_fkey(full_name)");
+
+    if (startDate) query = query.gte("date_in", startDate);
+    if (endDate) query = query.lte("date_in", endDate);
+
+    const { data: orders, error } = await query.order("date_in", {
+      ascending: false,
+    });
+
+    if (error) throw error;
+
+    const report = {
+      totalOrders: orders.length,
+      totalRevenue: orders.reduce(
+        (acc, o) => acc + (parseFloat(o.total_cost) || 0),
+        0
+      ),
+      pendingPayment: orders.reduce((acc, o) => {
+        const cost = parseFloat(o.total_cost) || 0;
+        if (o.payment_status === "DP 50%") return acc + cost * 0.5;
+        if (o.payment_status === "Belum Lunas") return acc + cost;
+        return acc;
+      }, 0),
+      completedOrders: orders.filter((o) => o.status === "Selesai").length,
+      paymentStatus: {
+        Lunas: orders.filter((o) => o.payment_status === "Lunas").length,
+        "DP 50%": orders.filter((o) => o.payment_status === "DP 50%").length,
+        "Belum Lunas": orders.filter((o) => o.payment_status === "Belum Lunas")
+          .length,
+      },
+    };
+
+    const completionRate =
+      report.totalOrders > 0
+        ? (report.completedOrders / report.totalOrders) * 100
+        : 0;
+
+    let html = `<div style="margin: 20px 0;"><h4>Ringkasan Laporan</h4><div class="stats-grid"><div class="stat-card"><div class="stat-value">${
+      report.totalOrders
+    }</div><div class="stat-label">Total Order</div></div><div class="stat-card"><div class="stat-value">${formatCurrency(
+      report.totalRevenue
+    )}</div><div class="stat-label">Total Pendapatan</div></div><div class="stat-card"><div class="stat-value">${formatCurrency(
+      report.pendingPayment
+    )}</div><div class="stat-label">Piutang</div></div><div class="stat-card"><div class="stat-value">${completionRate.toFixed(
+      1
+    )}%</div><div class="stat-label">Completion Rate</div></div></div></div><div style="margin: 20px 0;"><h4>Status Pembayaran</h4><div style="display: flex; gap: 20px; flex-wrap: wrap;">`;
+    for (const [status, count] of Object.entries(report.paymentStatus)) {
+      html += `<div style="text-align: center;"><div style="font-size: 24px; font-weight: bold;">${count}</div><div style="font-size: 12px; color: #666;">${status}</div></div>`;
     }
+    html += `</div></div><div style="margin: 20px 0;"><h4>Detail Transaksi</h4><div class="table-responsive"><table class="table"><thead><tr><th>ID Order</th><th>Tanggal</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Pembayaran</th></tr></thead><tbody>`;
+    orders.forEach((order) => {
+      html += `<tr><td>#${order.id}</td><td>${new Date(
+        order.date_in
+      ).toLocaleDateString(
+        "id-ID"
+      )}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+        order.status
+      }</span></td><td>${
+        order.profiles?.full_name || "-"
+      }</td><td>${formatCurrency(order.total_cost)}</td><td>${
+        order.payment_status
+      }</td></tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+    document.getElementById("reportResults").innerHTML = html;
   } catch (error) {
     showNotification("Gagal generate laporan", "error");
+    console.error("Generate Financial Report error:", error);
   }
 }
 
 async function showInvoiceModal(orderId) {
   currentWorkOrderId = orderId;
   showModal("invoiceModal");
+  document.getElementById("invoicePreview").innerHTML =
+    "<p style='text-align: center; padding: 20px;'>Memuat invoice...</p>";
+
   try {
-    const response = await fetch(
-      `${SCRIPT_URL}?action=generateInvoice&orderId=${orderId}`
-    );
-    const result = await response.json();
-    if (result.success)
-      document.getElementById("invoicePreview").innerHTML = result.html;
+    // Fetch order details with customer and technician
+    const { data: order, error: orderError } = await db
+      .from("work_orders")
+      .select("*, customers(*), profiles!work_orders_technician_id_fkey(*)")
+      .eq("id", orderId)
+      .single();
+
+    if (orderError) throw orderError;
+
+    // Fetch company settings
+    const { data: settingsData, error: settingsError } = await db
+      .from("settings")
+      .select("*");
+
+    if (settingsError) throw settingsError;
+
+    const settings = {};
+    settingsData.forEach((s) => (settings[s.key] = s.value));
+
+    const companyName = settings.company_name || "BENGKEL MOTOR";
+    const companyAddress =
+      settings.company_address || "Jl. Contoh No. 123, Jakarta";
+    const companyPhone = settings.company_phone || "021-1234567";
+
+    const html = `
+      <div class="invoice-content" style="font-family: Arial, sans-serif; padding: 20px; background: white; color: #333;">
+        <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
+          <div style="font-size: 24px; font-weight: bold;">${companyName}</div>
+          <div>${companyAddress}</div>
+          <div>Telp: ${companyPhone}</div>
+          <h1 style="font-size: 28px; margin: 20px 0;">INVOICE</h1>
+          <div>No: INV-${order.id}-${new Date()
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "")}</div>
+        </div>
+        
+        <div style="margin: 30px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div>
+            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Work Order ID:</b> <span>#${
+              order.id
+            }</span></div>
+            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Plat Nomor:</b> <span>${
+              order.vehicles?.plate || "-"
+            }</span></div>
+          </div>
+          <div>
+            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Tanggal:</b> <span>${new Date(
+              order.date_in
+            ).toLocaleDateString()}</span></div>
+            <div style="display: flex; margin-bottom: 10px;"><b style="width: 120px;">Pelanggan:</b> <span>${
+              order.customers?.name || "-"
+            }</span></div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <b style="display: block; margin-bottom: 5px;">Keluhan:</b>
+          <p style="margin: 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">${
+            order.complaint || "-"
+          }</p>
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 30px 0;">
+          <thead>
+            <tr style="background: #f4f4f4;">
+              <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Deskripsi</th>
+              <th style="border: 1px solid #ddd; padding: 12px; text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 12px;">Total Biaya Servis & Sparepart</td>
+              <td style="border: 1px solid #ddd; padding: 12px; text-align: right;">${formatCurrency(
+                order.total_cost
+              )}</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div style="text-align: right; font-size: 18px; font-weight: bold; margin-top: 30px;">
+          <div>Total: ${formatCurrency(order.total_cost)}</div>
+          <div style="font-size: 14px; color: #666; margin-top: 5px;">Status: ${
+            order.payment_status
+          }</div>
+        </div>
+        
+        <div style="margin-top: 50px; display: flex; justify-content: space-between;">
+          <div style="width: 200px; text-align: center;">
+            <div>Hormat Kami,</div>
+            <div style="border-top: 1px solid #000; margin-top: 60px;"></div>
+            <div>${companyName}</div>
+          </div>
+          <div style="width: 200px; text-align: center;">
+            <div>Pelanggan,</div>
+            <div style="border-top: 1px solid #000; margin-top: 60px;"></div>
+            <div>${order.customers?.name || "Nama Terang"}</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
+          <p>Terima kasih telah mempercayakan kendaraan Anda kepada kami.</p>
+        </div>
+      </div>
+    `;
+    document.getElementById("invoicePreview").innerHTML = html;
   } catch (error) {
+    console.error("Show Invoice error:", error);
     document.getElementById("invoicePreview").innerHTML =
-      "<p>Gagal memuat invoice</p>";
+      "<p style='color: red; padding: 20px;'>Gagal memuat invoice. Silakan periksa koneksi atau data.</p>";
   }
 }
 
@@ -669,33 +896,47 @@ async function downloadInvoiceAsPNG() {
   }
 }
 
+function showNewUserModal() {
+  showModal("newUserModal");
+  document.getElementById("newUserForm").reset();
+  document.querySelector("#newUserModal h3").textContent = "Tambah User Baru";
+  const submitBtn = document.querySelector("#newUserModal .btn-primary");
+  submitBtn.textContent = "Simpan User";
+  submitBtn.onclick = createNewUser;
+}
+
 async function loadUsersList() {
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getAllUsers`);
-    const result = await response.json();
-    if (result.success) {
-      document.getElementById("usersListTable").innerHTML = result.data
-        .map(
-          (user) =>
-            `<tr><td>${user.username}</td><td>${
-              user.nama
-            }</td><td><span class="role-badge role-${
-              user.role
-            }">${user.role.toUpperCase()}</span></td><td>${
-              user.telepon || "-"
-            }</td><td>-</td><td><button class="btn" onclick="editUser('${
-              user.id
-            }')" ${
-              user.id == currentUser.id ? "disabled" : ""
-            }><i class="fas fa-edit"></i></button><button class="btn" onclick="deleteUser('${
-              user.id
-            }')" ${
-              user.id == currentUser.id ? "disabled" : ""
-            }><i class="fas fa-trash"></i></button></td></tr>`
-        )
-        .join("");
-    }
-  } catch (error) {}
+    const { data: users, error } = await db
+      .from("profiles")
+      .select("*")
+      .order("username", { ascending: true });
+
+    if (error) throw error;
+
+    document.getElementById("usersListTable").innerHTML = users
+      .map(
+        (user) =>
+          `<tr><td>${user.username}</td><td>${
+            user.full_name
+          }</td><td><span class="role-badge role-${
+            user.role
+          }">${user.role.toUpperCase()}</span></td><td>${
+            user.phone || "-"
+          }</td><td>-</td><td><button class="btn" onclick="editUser('${
+            user.id
+          }')" ${
+            user.id == currentUser.id ? "disabled" : ""
+          }><i class="fas fa-edit"></i></button><button class="btn" onclick="deleteUser('${
+            user.id
+          }')" ${
+            user.id == currentUser.id ? "disabled" : ""
+          }><i class="fas fa-trash"></i></button></td></tr>`
+      )
+      .join("");
+  } catch (error) {
+    console.error("Load Users error:", error);
+  }
 }
 
 async function createNewUser() {
@@ -709,26 +950,23 @@ async function createNewUser() {
     return;
   }
   try {
-    const params = new URLSearchParams({
-      action: "createNewUser",
+    const { error } = await db.from("profiles").insert({
       username,
       password,
-      nama,
+      full_name: nama,
       role,
-      telepon,
+      phone: telepon,
     });
-    const response = await fetch(`${SCRIPT_URL}?${params}`);
-    const result = await response.json();
-    if (result.success) {
-      showNotification("User berhasil ditambahkan", "success");
-      closeModal("newUserModal");
-      document.getElementById("newUserForm").reset();
-      await loadUsersList();
-    } else {
-      showNotification(result.message, "error");
-    }
+
+    if (error) throw error;
+
+    showNotification("User berhasil ditambahkan", "success");
+    closeModal("newUserModal");
+    document.getElementById("newUserForm").reset();
+    await loadUsersList();
   } catch (error) {
     showNotification("Gagal menambahkan user", "error");
+    console.error("Create User error:", error);
   }
 }
 
@@ -746,29 +984,30 @@ async function updateProfile() {
   const telepon = document.getElementById("profilePhone").value;
   const password = document.getElementById("profilePassword").value;
   try {
-    const params = new URLSearchParams({
-      action: "updateUser",
-      id: currentUser.id,
-      nama,
-      telepon,
-    });
-    if (password) params.append("password", password);
-    const response = await fetch(`${SCRIPT_URL}?${params}`);
-    const result = await response.json();
-    if (result.success) {
-      currentUser.nama = nama;
-      currentUser.telepon = telepon;
-      localStorage.setItem("bengkel_user", JSON.stringify(currentUser));
-      document.getElementById("topbarUsername").textContent = nama;
-      document.getElementById("sidebarUsername").textContent =
-        currentUser.username;
-      showNotification("Profile berhasil diupdate", "success");
-      closeModal("profileModal");
-    } else {
-      showNotification(result.message, "error");
-    }
+    const updateData = {
+      full_name: nama,
+      phone: telepon,
+    };
+    if (password) updateData.password = password;
+
+    const { error } = await db
+      .from("profiles")
+      .update(updateData)
+      .eq("id", currentUser.id);
+
+    if (error) throw error;
+
+    currentUser.nama = nama;
+    currentUser.telepon = telepon;
+    localStorage.setItem("bengkel_user", JSON.stringify(currentUser));
+    document.getElementById("topbarUsername").textContent = nama;
+    document.getElementById("sidebarUsername").textContent =
+      currentUser.username;
+    showNotification("Profile berhasil diupdate", "success");
+    closeModal("profileModal");
   } catch (error) {
     showNotification("Gagal update profile", "error");
+    console.error("Update Profile error:", error);
   }
 }
 
@@ -812,57 +1051,99 @@ function loadPerformanceChart() {
   });
 }
 
-function showNotification(message, type) {
-  const content = document.getElementById("notificationContent");
-  const icons = {
-    success:
-      '<i class="fas fa-check-circle" style="color: var(--success);"></i>',
-    error:
-      '<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i>',
-    info: '<i class="fas fa-info-circle" style="color: var(--info);"></i>',
-    warning:
-      '<i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i>',
-  };
-  content.innerHTML = `<div style="text-align: center; padding: 10px;"><div style="font-size: 54px; margin-bottom: 20px;">${
-    icons[type] || icons.info
-  }</div><div style="font-weight: 500; font-size: 16px; color: var(--text-main);">${message}</div></div>`;
-  showModal("notificationModal");
-  setTimeout(() => {
-    closeModal("notificationModal");
-  }, 3000);
-}
-
-async function showNewWorkOrderModal() {
-  showModal("newWorkOrderModal");
-  const custSelect = document.getElementById("woCustomer");
-  const techSelect = document.getElementById("woTeknisi");
-
-  // Jika data sudah ada di cache, langsung gunakan
-  if (customersCache && techniciansCache) {
-    populateDropdowns(customersCache, techniciansCache);
+function showNotification(message, type = "info") {
+  // Silent filter for "processing" type messages to reduce clutter
+  const silentMessages = ["Sedang", "Memproses", "Menyiapkan", "Memuat"];
+  if (type === "info" && silentMessages.some((m) => message.includes(m))) {
+    console.log("Notification suppressed:", message);
     return;
   }
 
-  custSelect.innerHTML = '<option value="">Memuat pelanggan...</option>';
-  techSelect.innerHTML = '<option value="">Memuat teknisi...</option>';
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
 
-  try {
-    const [custRes, techRes] = await Promise.all([
-      fetch(`${SCRIPT_URL}?action=getCustomers`),
-      fetch(`${SCRIPT_URL}?action=getAllUsers`),
-    ]);
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
 
-    const [custData, techData] = await Promise.all([
-      custRes.json(),
-      techRes.json(),
-    ]);
+  const icons = {
+    success: '<i class="fas fa-check-circle text-success"></i>',
+    error: '<i class="fas fa-exclamation-circle text-danger"></i>',
+    info: '<i class="fas fa-info-circle text-info"></i>',
+    warning: '<i class="fas fa-exclamation-triangle text-warning"></i>',
+  };
 
-    if (custData.success) customersCache = custData.data;
-    if (techData.success) techniciansCache = techData.data;
+  toast.innerHTML = `
+    <div class="toast-icon">${icons[type] || icons.info}</div>
+    <div class="toast-content">${message}</div>
+  `;
 
-    populateDropdowns(customersCache, techniciansCache);
-  } catch (err) {
-    showNotification("Gagal memuat data pelanggan/teknisi", "error");
+  container.appendChild(toast);
+
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.add("removing");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+async function showWorkOrderModal(id = null) {
+  const modalId = "workOrderModal";
+  showModal(modalId);
+  const form = document.getElementById("workOrderForm");
+  form.reset();
+  document.getElementById("woId").value = id || "";
+  document.getElementById("woModalTitle").textContent = id
+    ? "Edit Work Order #" + id
+    : "Work Order Baru";
+
+  const custSelect = document.getElementById("woCustomer");
+  const techSelect = document.getElementById("woTeknisi");
+
+  // Load dropdown data if not cached
+  if (!customersCache || !techniciansCache) {
+    custSelect.innerHTML = '<option value="">Memuat pelanggan...</option>';
+    techSelect.innerHTML = '<option value="">Memuat teknisi...</option>';
+    try {
+      const [{ data: customers }, { data: users }] = await Promise.all([
+        db.from("customers").select("*").order("name"),
+        db.from("profiles").select("*"),
+      ]);
+      customersCache = customers;
+      techniciansCache = users;
+    } catch (err) {
+      console.error("Load Modal Data error:", err);
+    }
+  }
+
+  populateDropdowns(customersCache, techniciansCache);
+
+  if (id) {
+    try {
+      const { data: order, error } = await db
+        .from("work_orders")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+
+      document.getElementById("woCustomer").value = order.customer_id;
+      document.getElementById("woKeluhan").value = order.complaint;
+      document.getElementById("woStatus").value = order.status;
+      document.getElementById("woTotalCost").value = order.total_cost;
+      document.getElementById("woTeknisi").value =
+        techniciansCache.find((t) => t.id === order.technician_id)?.username ||
+        "";
+      document.getElementById("woEstimasi").value = order.date_out
+        ? new Date(order.date_out).toISOString().split("T")[0]
+        : "";
+      document.getElementById("woPaymentStatus").value = order.payment_status;
+    } catch (err) {
+      showNotification("Gagal memuat data work order", "error");
+    }
   }
 }
 
@@ -874,7 +1155,7 @@ function populateDropdowns(customers, technicians) {
   customers.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c.id;
-    opt.textContent = `${c.nama} (${c.telepon})`;
+    opt.textContent = `${c.name} (${c.phone})`;
     custSelect.appendChild(opt);
   });
 
@@ -884,79 +1165,151 @@ function populateDropdowns(customers, technicians) {
     .forEach((u) => {
       const opt = document.createElement("option");
       opt.value = u.username;
-      opt.textContent = u.nama;
+      opt.textContent = u.full_name;
       techSelect.appendChild(opt);
     });
+
+  // Re-initialize Select2 if available
+  if (typeof $ !== "undefined" && $.fn.select2) {
+    const commonSettings = {
+      dropdownParent: $("#workOrderModal"),
+      width: "100%",
+    };
+
+    $("#woCustomer").select2({
+      ...commonSettings,
+      placeholder: "Cari Pelanggan...",
+      allowClear: true,
+    });
+
+    $("#woTeknisi").select2({
+      ...commonSettings,
+      placeholder: "Pilih Teknisi...",
+      allowClear: true,
+    });
+
+    // Fix for Select2 focus in modal
+    $(document).on("select2:open", () => {
+      document.querySelector(".select2-search__field").focus();
+    });
+  }
 }
 
-async function submitNewWorkOrder() {
+async function submitWorkOrder() {
+  const id = document.getElementById("woId").value;
   const customerId = document.getElementById("woCustomer").value;
   const keluhan = document.getElementById("woKeluhan").value;
   const teknisi = document.getElementById("woTeknisi").value;
+  const status = document.getElementById("woStatus").value;
+  const totalCost = document.getElementById("woTotalCost").value;
   const estimasi = document.getElementById("woEstimasi").value;
+  const paymentStatus = document.getElementById("woPaymentStatus").value;
+
   if (!customerId || !keluhan) {
-    showNotification("Pelanggan and Keluhan wajib diisi", "warning");
+    showNotification("Pelanggan dan Keluhan wajib diisi", "warning");
     return;
   }
-  const params = new URLSearchParams({
-    action: "createWorkOrder",
-    customerId,
-    keluhan,
-    teknisi,
-    tanggalSelesai: estimasi,
-    createdBy: currentUser.username,
-  });
+
   try {
-    showNotification("Membuat work order...", "info");
-    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-    const result = await res.json();
-    if (result.success) {
+    const { data: techProfile } = await db
+      .from("profiles")
+      .select("id")
+      .eq("username", teknisi)
+      .single();
+
+    const data = {
+      customer_id: customerId,
+      complaint: keluhan,
+      technician_id: techProfile?.id,
+      status: status,
+      total_cost: parseFloat(totalCost) || 0,
+      date_out: estimasi || null,
+      payment_status: paymentStatus,
+    };
+
+    if (id) {
+      const { error } = await db.from("work_orders").update(data).eq("id", id);
+      if (error) throw error;
+      showNotification("Work Order berhasil diupdate!", "success");
+    } else {
+      const { data: creatorProfile } = await db
+        .from("profiles")
+        .select("id")
+        .eq("username", currentUser.username)
+        .single();
+      data.created_by = creatorProfile?.id;
+      const { error } = await db.from("work_orders").insert(data);
+      if (error) throw error;
       showNotification("Work Order berhasil dibuat!", "success");
-      closeModal("newWorkOrderModal");
-      document.getElementById("newWorkOrderForm").reset();
-      loadPage(currentPage);
     }
+
+    closeModal("workOrderModal");
+    loadPage(currentPage);
   } catch (err) {
-    showNotification("Gagal membuat work order", "error");
+    showNotification("Gagal menyimpan work order", "error");
+    console.error("Submit WO error:", err);
   }
 }
 
-function showNewCustomerModal() {
-  showModal("newCustomerModal");
+async function showCustomerModal(id = null) {
+  showModal("customerModal");
+  const form = document.getElementById("customerForm");
+  form.reset();
+  document.getElementById("custId").value = id || "";
+  document.getElementById("custModalTitle").textContent = id
+    ? "Edit Pelanggan"
+    : "Tambah Pelanggan Baru";
+
+  if (id) {
+    try {
+      const { data: cust, error } = await db
+        .from("customers")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+      document.getElementById("custNama").value = cust.name;
+      document.getElementById("custPhone").value = cust.phone;
+      document.getElementById("custAlamat").value = cust.address;
+    } catch (err) {
+      showNotification("Gagal memuat data pelanggan", "error");
+    }
+  }
 }
 
-async function submitNewCustomer() {
+async function submitCustomer() {
+  const id = document.getElementById("custId").value;
   const nama = document.getElementById("custNama").value;
   const telepon = document.getElementById("custPhone").value;
   const alamat = document.getElementById("custAlamat").value;
+
   if (!nama || !telepon) {
     showNotification("Nama dan Telepon wajib diisi", "warning");
     return;
   }
-  const params = new URLSearchParams({
-    action: "createCustomer",
-    nama,
-    telepon,
-    alamat,
-  });
+
   try {
-    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-    const result = await res.json();
-    if (result.success) {
+    const data = { name: nama, phone: telepon, address: alamat };
+    if (id) {
+      const { error } = await db.from("customers").update(data).eq("id", id);
+      if (error) throw error;
+      showNotification("Pelanggan berhasil diupdate!", "success");
+    } else {
+      const { error } = await db.from("customers").insert(data);
+      if (error) throw error;
       showNotification("Pelanggan berhasil disimpan!", "success");
-      closeModal("newCustomerModal");
-      document.getElementById("newCustomerForm").reset();
-      if (
-        document.getElementById("newWorkOrderModal").classList.contains("show")
-      ) {
-        customersCache = null; // Reset cache agar ambil baru
-        showNewWorkOrderModal(); // Refresh dropdown
-      } else {
-        loadCustomers();
-      }
+    }
+
+    closeModal("customerModal");
+    if (document.getElementById("workOrderModal").classList.contains("show")) {
+      customersCache = null;
+      showWorkOrderModal(document.getElementById("woId").value || null);
+    } else {
+      loadCustomers();
     }
   } catch (err) {
     showNotification("Gagal menyimpan pelanggan", "error");
+    console.error("Submit Customer error:", err);
   }
 }
 
@@ -970,76 +1323,243 @@ async function submitNewItem() {
   const stok = document.getElementById("itemStok").value;
   const beli = document.getElementById("itemBeli").value;
   const jual = document.getElementById("itemJual").value;
+
   if (!nama) {
     showNotification("Nama barang wajib diisi", "warning");
     return;
   }
-  showNotification("Menyimpan item (Simulasi)...", "info");
-  setTimeout(() => {
+
+  try {
+    showNotification("Menyimpan item...", "info");
+    const { error } = await db.from("inventory").insert({
+      name: nama,
+      category: kategori,
+      stock: parseInt(stok) || 0,
+      buy_price: parseFloat(beli) || 0,
+      sell_price: parseFloat(jual) || 0,
+      part_code: "ITEM-" + Date.now().toString().slice(-6), // Generate simple code
+    });
+
+    if (error) throw error;
+
     showNotification("Item berhasil ditambahkan!", "success");
     closeModal("newItemModal");
     loadInventory();
-  }, 1000);
+  } catch (err) {
+    showNotification("Gagal menyimpan item", "error");
+    console.error("Submit Item error:", err);
+  }
+}
+
+async function updateStock(itemId) {
+  try {
+    const { data: item, error } = await db
+      .from("inventory")
+      .select("*")
+      .eq("id", itemId)
+      .single();
+
+    if (error) throw error;
+
+    showModal("stockModal");
+    document.getElementById("stockItemId").value = item.id;
+    document.getElementById("stockItemName").value = item.name;
+    document.getElementById("stockCurrent").value = item.stock;
+    document.getElementById("stockAdjustment").value = "";
+    document.getElementById("stockNotes").value = "";
+  } catch (err) {
+    showNotification("Gagal memuat data item", "error");
+  }
+}
+
+async function submitStockUpdate() {
+  const id = document.getElementById("stockItemId").value;
+  const adj = parseInt(document.getElementById("stockAdjustment").value) || 0;
+  const current = parseInt(document.getElementById("stockCurrent").value) || 0;
+  const notes = document.getElementById("stockNotes").value;
+
+  if (adj === 0) {
+    showNotification("Harap isi jumlah penyesuaian", "warning");
+    return;
+  }
+
+  try {
+    showNotification("Mengupdate stok...", "info");
+    const { error } = await db
+      .from("inventory")
+      .update({ stock: current + adj })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    // Log to audit log
+    await db.from("audit_log").insert({
+      user_id: currentUser.username,
+      action: "updateStock",
+      details: `Item ID: ${id}, Adj: ${adj}, Notes: ${notes}`,
+    });
+
+    showNotification("Stok berhasil diupdate!", "success");
+    closeModal("stockModal");
+    loadInventory();
+  } catch (err) {
+    showNotification("Gagal update stok", "error");
+  }
 }
 async function loadFinancialData() {
   const tableBody = document.getElementById("financialTable");
   tableBody.innerHTML =
     '<tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr>';
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getFinancialReport`);
-    const result = await response.json();
-    if (result.success) {
-      tableBody.innerHTML = result.report.details
-        .map(
-          (order) =>
-            `<tr><td>#${order.id}</td><td>${new Date(
-              order.tanggal
-            ).toLocaleDateString()}</td><td>Customer</td><td>Servis</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
-              order.status
-            }</span></td><td>Rp ${order.total.toLocaleString()}</td><td>${
-              order.pembayaran
-            }</td><td><button class="btn btn-sm" onclick="showInvoiceModal(${
-              order.id
-            })"><i class="fas fa-eye"></i></button></td></tr>`
-        )
-        .join("");
-    }
+    const { data: orders, error } = await db
+      .from("work_orders")
+      .select("*, customers(name)")
+      .order("date_in", { ascending: false });
+
+    if (error) throw error;
+
+    tableBody.innerHTML = orders
+      .map(
+        (order) =>
+          `<tr><td>#${order.id}</td><td>${new Date(
+            order.date_in
+          ).toLocaleDateString()}</td><td>${
+            order.customers?.name || "-"
+          }</td><td>Servis</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+            order.status
+          }</span></td><td>${formatCurrency(order.total_cost)}</td><td>${
+            order.payment_status
+          }</td><td><button class="btn btn-sm" onclick="showInvoiceModal(${
+            order.id
+          })"><i class="fas fa-eye"></i></button></td></tr>`
+      )
+      .join("");
   } catch (error) {
     showNotification("Gagal memuat data keuangan", "error");
+    console.error("Load Financial Data error:", error);
   }
 }
 
 async function exportFullReport() {
-  showNotification("Menyiapkan ekspor data...", "info");
-  window.open(`${SCRIPT_URL}?action=getFinancialReport&export=true`, "_blank");
-}
+  try {
+    const { data: orders, error } = await db
+      .from("work_orders")
+      .select(
+        "*, customers(name), profiles!work_orders_technician_id_fkey(full_name)"
+      )
+      .order("date_in", { ascending: false });
 
-function updateStock(itemId) {
-  showNotification("Fitur update stok dalam pengembangan", "info");
-}
+    if (error) throw error;
 
-function editWorkOrder(id) {
-  showNotification("Fitur edit work order ID: " + id, "info");
-}
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent +=
+      "ID,Tanggal,Customer,Keluhan,Status,Teknisi,Total,Pembayaran\n";
 
-function editCustomer(id) {
-  showNotification("Fitur edit customer ID: " + id, "info");
+    orders.forEach((o) => {
+      const row = [
+        o.id,
+        new Date(o.date_in).toLocaleDateString(),
+        o.customers?.name || "-",
+        (o.complaint || "").replace(/,/g, ";"),
+        o.status,
+        o.profiles?.full_name || "-",
+        o.total_cost || 0,
+        o.payment_status,
+      ].join(",");
+      csvContent += row + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `Laporan-Keuangan-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showNotification("Laporan berhasil diunduh!", "success");
+  } catch (err) {
+    showNotification("Gagal mengekspor laporan", "error");
+    console.error("Export error:", err);
+  }
 }
 
 async function deleteUser(id) {
   if (confirm("Anda yakin ingin menghapus user ini?")) {
     try {
       showNotification("Menghapus user...", "info");
-      // Simulated delete for now as script.gs might not have it yet
-      // In production, add action=deleteUser to code.gs
+      const { error } = await db.from("profiles").delete().eq("id", id);
+      if (error) throw error;
       showNotification("User berhasil dihapus", "success");
       await loadUsersList();
     } catch (error) {
       showNotification("Gagal menghapus user", "error");
+      console.error("Delete User error:", error);
     }
   }
 }
 
-function editUser(id) {
-  showNotification("Edit user ID: " + id, "info");
+async function editUser(id) {
+  try {
+    const { data: user, error } = await db
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) throw error;
+
+    showModal("newUserModal");
+    document.getElementById("newUsername").value = user.username;
+    document.getElementById("newPassword").value = user.password;
+    document.getElementById("newName").value = user.full_name;
+    document.getElementById("newRole").value = user.role;
+    document.getElementById("newPhone").value = user.phone || "";
+
+    // Change modal title and button for edit
+    document.querySelector("#newUserModal h3").textContent = "Edit User";
+    document.querySelector("#newUserModal .btn-primary").textContent =
+      "Update User";
+    document.querySelector("#newUserModal .btn-primary").onclick = () =>
+      updateUser(id);
+  } catch (err) {
+    showNotification("Gagal memuat data user", "error");
+  }
+}
+
+async function updateUser(id) {
+  const username = document.getElementById("newUsername").value;
+  const password = document.getElementById("newPassword").value;
+  const nama = document.getElementById("newName").value;
+  const role = document.getElementById("newRole").value;
+  const telepon = document.getElementById("newPhone").value;
+
+  try {
+    const { error } = await db
+      .from("profiles")
+      .update({
+        username,
+        password,
+        full_name: nama,
+        role,
+        phone: telepon,
+      })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    showNotification("User berhasil diupdate", "success");
+    closeModal("newUserModal");
+    // Reset modal state
+    document.querySelector("#newUserModal h3").textContent = "Tambah User Baru";
+    document.querySelector("#newUserModal .btn-primary").textContent =
+      "Simpan User";
+    document.querySelector("#newUserModal .btn-primary").onclick =
+      createNewUser;
+
+    await loadUsersList();
+  } catch (error) {
+    showNotification("Gagal update user", "error");
+  }
 }

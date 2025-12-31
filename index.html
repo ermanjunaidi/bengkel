@@ -560,15 +560,16 @@
       </div>
     </div>
 
-    <!-- New Work Order Modal -->
-    <div class="modal" id="newWorkOrderModal">
+    <!-- New/Edit Work Order Modal -->
+    <div class="modal" id="workOrderModal">
       <div class="modal-content" style="max-width: 800px">
         <div class="modal-header">
-          <h3>Work Order Baru</h3>
-          <button class="close-modal" data-modal="newWorkOrderModal">&times;</button>
+          <h3 id="woModalTitle">Work Order Baru</h3>
+          <button class="close-modal" data-modal="workOrderModal">&times;</button>
         </div>
         <div class="modal-body">
-          <form id="newWorkOrderForm">
+          <form id="workOrderForm">
+            <input type="hidden" id="woId">
             <div class="form-row">
               <div class="form-group flex-1">
                 <label>Pilih Pelanggan *</label>
@@ -585,6 +586,22 @@
             </div>
             <div class="form-row">
               <div class="form-group flex-1">
+                <label>Status Work Order</label>
+                <select id="woStatus" class="form-control">
+                  <option value="Menunggu">Menunggu</option>
+                  <option value="Diproses">Diproses</option>
+                  <option value="Selesai">Selesai</option>
+                  <option value="Diambil">Diambil</option>
+                  <option value="Dibatalkan">Dibatalkan</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label>Total Biaya (Rp)</label>
+                <input type="number" id="woTotalCost" class="form-control" value="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
                 <label>Teknisi Penanggung Jawab</label>
                 <select id="woTeknisi" class="form-control"></select>
               </div>
@@ -593,24 +610,33 @@
                 <input type="date" id="woEstimasi" class="form-control">
               </div>
             </div>
+            <div class="form-group">
+              <label>Status Pembayaran</label>
+              <select id="woPaymentStatus" class="form-control">
+                <option value="Belum Lunas">Belum Lunas</option>
+                <option value="DP 50%">DP 50%</option>
+                <option value="Lunas">Lunas</option>
+              </select>
+            </div>
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn" data-modal="newWorkOrderModal">Batal</button>
-          <button class="btn btn-primary" onclick="submitNewWorkOrder()">Buat Work Order</button>
+          <button class="btn" data-modal="workOrderModal">Batal</button>
+          <button class="btn btn-primary" id="woSubmitBtn" onclick="submitWorkOrder()">Simpan</button>
         </div>
       </div>
     </div>
 
-    <!-- New Customer Modal -->
-    <div class="modal" id="newCustomerModal">
+    <!-- Customer Modal (New/Edit) -->
+    <div class="modal" id="customerModal">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Tambah Pelanggan Baru</h3>
-          <button class="close-modal" data-modal="newCustomerModal">&times;</button>
+          <h3 id="custModalTitle">Tambah Pelanggan Baru</h3>
+          <button class="close-modal" data-modal="customerModal">&times;</button>
         </div>
         <div class="modal-body">
-          <form id="newCustomerForm">
+          <form id="customerForm">
+            <input type="hidden" id="custId">
             <div class="form-group">
               <label>Nama Lengkap *</label>
               <input type="text" id="custNama" class="form-control" required>
@@ -626,73 +652,50 @@
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn" data-modal="newCustomerModal">Batal</button>
-          <button class="btn btn-primary" onclick="submitNewCustomer()">Simpan Pelanggan</button>
+          <button class="btn" data-modal="customerModal">Batal</button>
+          <button class="btn btn-primary" id="custSubmitBtn" onclick="submitCustomer()">Simpan</button>
         </div>
       </div>
     </div>
 
-    <!-- New Item Modal -->
-    <div class="modal" id="newItemModal">
-      <div class="modal-content">
+    <!-- Stock Update Modal -->
+    <div class="modal" id="stockModal">
+      <div class="modal-content" style="max-width: 400px">
         <div class="modal-header">
-          <h3>Tambah Item Inventaris</h3>
-          <button class="close-modal" data-modal="newItemModal">&times;</button>
+          <h3>Update Stok</h3>
+          <button class="close-modal" data-modal="stockModal">&times;</button>
         </div>
         <div class="modal-body">
-          <form id="newItemForm">
+          <form id="stockForm">
+            <input type="hidden" id="stockItemId">
             <div class="form-group">
-              <label>Nama Barang *</label>
-              <input type="text" id="itemName" class="form-control" required>
+              <label>Nama Barang</label>
+              <input type="text" id="stockItemName" class="form-control" readonly>
             </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Kategori</label>
-                <input type="text" id="itemCat" class="form-control" placeholder="Sparepart/Oli">
-              </div>
-              <div class="form-group flex-1">
-                <label>Stok Awal</label>
-                <input type="number" id="itemStok" class="form-control" value="0">
-              </div>
+            <div class="form-group">
+              <label>Stok Saat Ini</label>
+              <input type="text" id="stockCurrent" class="form-control" readonly>
             </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Harga Beli</label>
-                <input type="number" id="itemBeli" class="form-control">
-              </div>
-              <div class="form-group flex-1">
-                <label>Harga Jual</label>
-                <input type="number" id="itemJual" class="form-control">
-              </div>
+            <div class="form-group">
+              <label>Tambah/Kurang Stok</label>
+              <input type="number" id="stockAdjustment" class="form-control" placeholder="Contoh: 5 atau -2" required>
+            </div>
+            <div class="form-group">
+              <label>Keterangan</label>
+              <input type="text" id="stockNotes" class="form-control" placeholder="Restock/Penjualan/dll">
             </div>
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn" data-modal="newItemModal">Batal</button>
-          <button class="btn btn-primary" onclick="submitNewItem()">Simpan Item</button>
+          <button class="btn" data-modal="stockModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitStockUpdate()">Update Stok</button>
         </div>
       </div>
     </div>
 
-    <!-- Notification Modal -->
-    <div class="modal" id="notificationModal">
-      <div class="modal-content" style="max-width: 400px">
-        <div class="modal-header">
-          <h3>Notifikasi</h3>
-          <button class="close-modal" data-modal="notificationModal">
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <div id="notificationContent"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn" data-modal="notificationModal">Tutup</button>
-        </div>
-      </div>
-    </div>
 
     <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="script.js"></script>
   </body>
