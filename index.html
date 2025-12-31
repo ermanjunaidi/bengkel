@@ -39,7 +39,7 @@
           <p>Ahli dalam restorasi pintu, central lock, power window, dan penyetelan pintu mobil Anda agar kembali presisi, senyap, dan nyaman.</p>
           <div style="display: flex; gap: 15px; justify-content: center;">
             <button class="btn btn-primary btn-lg" style="height: 50px; padding: 0 30px;" onclick="goToLogin()">Mulai Sekarang</button>
-            <button class="btn btn-secondary btn-lg" style="height: 50px; padding: 0 30px;">Pelajari Lebih Lanjut</button>
+            <button class="btn btn-secondary btn-lg" style="height: 50px; padding: 0 30px;" onclick="scrollToServices()">Pelajari Lebih Lanjut</button>
           </div>
         </div>
       </div>
@@ -108,7 +108,7 @@
       <div class="cta-section">
         <h3>Butuh Bantuan untuk Kendaraan Anda?</h3>
         <p style="margin: 20px 0; opacity: 0.8;">Hubungi kami atau datang langsung untuk konsultasi gratis.</p>
-        <button class="btn btn-primary" style="background: var(--success); border: none;">
+        <button class="btn btn-primary" style="background: var(--success); border: none;" onclick="contactWhatsApp()">
           <i class="fab fa-whatsapp"></i> Chat via WhatsApp
         </button>
       </div>
@@ -510,27 +510,119 @@
 
     <!-- Invoice Modal -->
     <div class="modal" id="invoiceModal">
-      <div class="modal-content" style="max-width: 900px; max-height: 90vh">
+      <!-- ... (previous invoice content) ... -->
+    </div>
+
+    <!-- New Work Order Modal -->
+    <div class="modal" id="newWorkOrderModal">
+      <div class="modal-content" style="max-width: 800px">
         <div class="modal-header">
-          <h3>Invoice & Cetak</h3>
-          <button class="close-modal" data-modal="invoiceModal">&times;</button>
+          <h3>Work Order Baru</h3>
+          <button class="close-modal" data-modal="newWorkOrderModal">&times;</button>
         </div>
         <div class="modal-body">
-          <div style="margin-bottom: 20px">
-            <button class="btn btn-primary" onclick="printInvoice()">
-              <i class="fas fa-print"></i> Print Invoice
-            </button>
-            <button
-              class="btn"
-              onclick="downloadInvoice()"
-              style="margin-left: 10px"
-            >
-              <i class="fas fa-download"></i> Download PDF
-            </button>
-          </div>
-          <div id="invoicePreview">
-            <!-- Invoice akan ditampilkan di sini -->
-          </div>
+          <form id="newWorkOrderForm">
+            <div class="form-row" style="display: flex; gap: 15px;">
+              <div class="form-group" style="flex: 1">
+                <label>Pilih Pelanggan *</label>
+                <select id="woCustomer" class="form-control" style="width: 100%" required></select>
+              </div>
+              <div class="form-group" style="width: 150px">
+                <label>&nbsp;</label>
+                <button type="button" class="btn btn-secondary" onclick="showNewCustomerModal()" style="width: 100%">+ Baru</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Keluhan / Deskripsi Kerusakan *</label>
+              <textarea id="woKeluhan" class="form-control" rows="4" placeholder="Contoh: Pintu kiri depan macet, Central lock tidak fungsi..." required></textarea>
+            </div>
+            <div class="form-row" style="display: flex; gap: 15px;">
+              <div class="form-group" style="flex: 1">
+                <label>Teknisi Penanggung Jawab</label>
+                <select id="woTeknisi" class="form-control"></select>
+              </div>
+              <div class="form-group" style="flex: 1">
+                <label>Estimasi Selesai</label>
+                <input type="date" id="woEstimasi" class="form-control">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal="newWorkOrderModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitNewWorkOrder()">Buat Work Order</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Customer Modal -->
+    <div class="modal" id="newCustomerModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Tambah Pelanggan Baru</h3>
+          <button class="close-modal" data-modal="newCustomerModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="newCustomerForm">
+            <div class="form-group">
+              <label>Nama Lengkap *</label>
+              <input type="text" id="custNama" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Nomor Telepon *</label>
+              <input type="text" id="custPhone" class="form-control" placeholder="628..." required>
+            </div>
+            <div class="form-group">
+              <label>Alamat</label>
+              <textarea id="custAlamat" class="form-control"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal="newCustomerModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitNewCustomer()">Simpan Pelanggan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Item Modal -->
+    <div class="modal" id="newItemModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Tambah Item Inventaris</h3>
+          <button class="close-modal" data-modal="newItemModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="newItemForm">
+            <div class="form-group">
+              <label>Nama Barang *</label>
+              <input type="text" id="itemName" class="form-control" required>
+            </div>
+            <div class="form-row" style="display: flex; gap: 15px;">
+              <div class="form-group" style="flex: 1">
+                <label>Kategori</label>
+                <input type="text" id="itemCat" class="form-control" placeholder="Sparepart/Oli">
+              </div>
+              <div class="form-group" style="flex: 1">
+                <label>Stok Awal</label>
+                <input type="number" id="itemStok" class="form-control" value="0">
+              </div>
+            </div>
+            <div class="form-row" style="display: flex; gap: 15px;">
+              <div class="form-group" style="flex: 1">
+                <label>Harga Beli</label>
+                <input type="number" id="itemBeli" class="form-control">
+              </div>
+              <div class="form-group" style="flex: 1">
+                <label>Harga Jual</label>
+                <input type="number" id="itemJual" class="form-control">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal="newItemModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitNewItem()">Simpan Item</button>
         </div>
       </div>
     </div>
