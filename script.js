@@ -862,7 +862,44 @@ async function updateInventorySearch(search) {
 }
 
 async function loadReports() {
-  contentArea.innerHTML = `<div class="stats-grid"><div class="card" onclick="showFinancialReport()"><div class="card-body" style="text-align: center; cursor: pointer; padding: 40px;"><i class="fas fa-file-invoice-dollar" style="font-size: 48px; color: var(--primary); margin-bottom: 20px;"></i><h3>Laporan Keuangan</h3><p>Pendapatan, pengeluaran, dan piutang.</p></div></div><div class="card"><div class="card-body" style="text-align: center; cursor: pointer; padding: 40px;"><i class="fas fa-user-gear" style="font-size: 48px; color: var(--success); margin-bottom: 20px;"></i><h3>Laporan Teknisi</h3><p>Performa dan beban kerja teknisi.</p></div></div><div class="card"><div class="card-body" style="text-align: center; cursor: pointer; padding: 40px;"><i class="fas fa-box-open" style="font-size: 48px; color: var(--warning); margin-bottom: 20px;"></i><h3>Laporan Stok</h3><p>Barang keluar masuk dan sisa stok.</p></div></div></div>`;
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Manajemen Laporan</h3>
+      </div>
+      <div class="card-body">
+        <div class="stats-grid">
+          <div class="card clickable-card" onclick="showFinancialReport()">
+            <div class="card-body" style="text-align: center; padding: 40px;">
+              <i class="fas fa-file-invoice-dollar" style="font-size: 48px; color: var(--primary); margin-bottom: 20px;"></i>
+              <h3>Laporan Keuangan</h3>
+              <p>Pendapatan, piutang, dan status pembayaran.</p>
+            </div>
+          </div>
+          <div class="card clickable-card" onclick="showStockReport()">
+            <div class="card-body" style="text-align: center; padding: 40px;">
+              <i class="fas fa-box-open" style="font-size: 48px; color: var(--warning); margin-bottom: 20px;"></i>
+              <h3>Laporan Stok</h3>
+              <p>Barang keluar masuk dan sisa inventaris.</p>
+            </div>
+          </div>
+          <div class="card clickable-card" onclick="showTechnicianReport()">
+            <div class="card-body" style="text-align: center; padding: 40px;">
+              <i class="fas fa-user-gear" style="font-size: 48px; color: var(--success); margin-bottom: 20px;"></i>
+              <h3>Laporan Teknisi</h3>
+              <p>Performa dan beban kerja setiap teknisi.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadFinancialPage() {
+  // Directly open the financial report for now as it's the primary need
+  await loadReports();
+  showFinancialReport();
 }
 
 async function loadSettings() {
@@ -1052,10 +1089,68 @@ async function generateFinancialReport() {
     });
     html += `</tbody></table></div></div>`;
     document.getElementById("reportResults").innerHTML = html;
+    // Save orders globally for export
+    window.lastReportData = orders;
   } catch (error) {
     showNotification("Gagal generate laporan", "error");
     console.error("Generate Financial Report error:", error);
   }
+}
+
+function showStockReport() {
+  showNotification("Laporan Stok sedang dalam pengembangan", "info");
+}
+
+function showTechnicianReport() {
+  showNotification("Laporan Teknisi sedang dalam pengembangan", "info");
+}
+
+function exportFinancialReport() {
+  const orders = window.lastReportData;
+  if (!orders || orders.length === 0) {
+    showNotification("Tidak ada data untuk diekspor", "warning");
+    return;
+  }
+
+  const csvRows = [
+    [
+      "ID Order",
+      "Tanggal",
+      "Pelanggan",
+      "Keluhan",
+      "Status",
+      "Teknisi",
+      "Total Cost",
+      "Pembayaran",
+    ],
+  ];
+
+  orders.forEach((o) => {
+    csvRows.push([
+      `#${o.id}`,
+      new Date(o.date_in).toLocaleDateString("id-ID"),
+      o.customers?.name || "-",
+      o.complaint?.replace(/,/g, " ") || "",
+      o.status,
+      o.profiles?.full_name || "-",
+      o.total_cost,
+      o.payment_status,
+    ]);
+  });
+
+  const csvContent = csvRows.map((e) => e.join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute(
+    "download",
+    `Laporan_Keuangan_${new Date().toISOString().split("T")[0]}.csv`
+  );
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 async function showInvoiceModal(orderId) {
@@ -1226,76 +1321,212 @@ async function downloadInvoiceAsPNG() {
 }
 
 function showNewUserModal() {
-  showModal("newUserModal");
   document.getElementById("newUserForm").reset();
   document.querySelector("#newUserModal h3").textContent = "Tambah User Baru";
-  const submitBtn = document.querySelector("#newUserModal .btn-primary");
-  submitBtn.textContent = "Simpan User";
-  submitBtn.onclick = createNewUser;
+  document.getElementById("userId").value = "";
+  document.getElementById("newPassword").required = true; // Password is required for new user
+  document
+    .getElementById("newUserModal")
+    .querySelector(".btn-primary").onclick = submitUser;
+  showModal("newUserModal");
 }
 
-async function loadUsersList() {
-  try {
-    const { data: users, error } = await db
-      .from("profiles")
-      .select("*")
-      .order("username", { ascending: true });
-
-    if (error) throw error;
-
-    document.getElementById("usersListTable").innerHTML = users
-      .map(
-        (user) =>
-          `<tr><td>${user.username}</td><td>${
-            user.full_name
-          }</td><td><span class="role-badge role-${
-            user.role
-          }">${user.role.toUpperCase()}</span></td><td>${
-            user.phone || "-"
-          }</td><td>-</td><td><button class="btn" onclick="editUser('${
-            user.id
-          }')" ${
-            user.id == currentUser.id ? "disabled" : ""
-          }><i class="fas fa-edit"></i></button><button class="btn" onclick="deleteUser('${
-            user.id
-          }')" ${
-            user.id == currentUser.id ? "disabled" : ""
-          }><i class="fas fa-trash"></i></button></td></tr>`
-      )
-      .join("");
-  } catch (error) {
-    console.error("Load Users error:", error);
-  }
-}
-
-async function createNewUser() {
+async function submitUser() {
+  const id = document.getElementById("userId").value;
   const username = document.getElementById("newUsername").value;
   const password = document.getElementById("newPassword").value;
   const nama = document.getElementById("newName").value;
   const role = document.getElementById("newRole").value;
   const telepon = document.getElementById("newPhone").value;
-  if (!username || !password || !nama || !role) {
+
+  if (!username || !nama || !role || (!id && !password)) {
+    // Password required only for new user
     showNotification("Harap isi semua field yang wajib", "error");
     return;
   }
+
+  const userData = {
+    username,
+    full_name: nama,
+    role,
+    phone: telepon,
+  };
+
+  if (password) {
+    // Only add password if it's provided (for new user or if changing existing)
+    userData.password = password;
+  }
+
   try {
-    const { error } = await db.from("profiles").insert({
-      username,
-      password,
-      full_name: nama,
-      role,
-      phone: telepon,
-    });
+    let error;
+    if (id) {
+      // Update existing user
+      const { error: err } = await db
+        .from("profiles")
+        .update(userData)
+        .eq("id", id);
+      error = err;
+    } else {
+      // Create new user
+      const { error: err } = await db.from("profiles").insert([userData]);
+      error = err;
+    }
 
     if (error) throw error;
 
-    showNotification("User berhasil ditambahkan", "success");
+    showNotification(
+      id ? "User berhasil diupdate" : "User berhasil ditambahkan",
+      "success"
+    );
     closeModal("newUserModal");
-    document.getElementById("newUserForm").reset();
-    await loadUsersList();
+    loadUsersPage(paginationState.users.page, paginationState.users.search);
   } catch (error) {
-    showNotification("Gagal menambahkan user", "error");
-    console.error("Create User error:", error);
+    showNotification("Gagal menyimpan user", "error");
+    console.error("Submit User error:", error);
+  }
+}
+
+async function editUser(userId) {
+  try {
+    const { data: user, error } = await db
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) throw error;
+
+    document.getElementById("newUserForm").reset();
+    document.querySelector("#newUserModal h3").textContent = "Edit User";
+    document.getElementById("userId").value = user.id;
+    document.getElementById("newUsername").value = user.username;
+    document.getElementById("newName").value = user.full_name;
+    document.getElementById("newRole").value = user.role;
+    document.getElementById("newPhone").value = user.phone || "";
+    document.getElementById("newPassword").value = ""; // Clear password field for security
+    document.getElementById("newPassword").required = false; // Password is not required for editing unless changed
+    document
+      .getElementById("newUserModal")
+      .querySelector(".btn-primary").onclick = submitUser;
+    showModal("newUserModal");
+  } catch (error) {
+    console.error("Error fetching user for edit:", error);
+    showNotification("Gagal memuat data user untuk diedit", "error");
+  }
+}
+
+async function loadUsersPage(page = 1, search = "") {
+  paginationState.users = paginationState.users || { page: 1, search: "" };
+  paginationState.users.page = page;
+  paginationState.users.search = search;
+
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Manajemen User</h3>
+      </div>
+      <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="showNewUserModal()"><i class="fas fa-plus"></i> Tambah User Baru</button>
+          ${renderSearchUI(
+            "users",
+            "updateUsersSearch",
+            "Cari Username atau Nama..."
+          )}
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Nama Lengkap</th>
+                <th>Role</th>
+                <th>Telepon</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="usersListTable">
+              <tr><td colspan="5" style="text-align: center;">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="usersPagination"></div>
+      </div>
+    </div>
+  `;
+  await loadUsersList(page, search);
+}
+
+async function updateUsersPage(page) {
+  await loadUsersPage(page, paginationState.users.search);
+}
+
+async function updateUsersSearch(search) {
+  await loadUsersPage(1, search);
+}
+
+async function loadUsersList(page = 1, search = "") {
+  try {
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = db.from("profiles").select("*", { count: "exact" });
+
+    if (search) {
+      query = query.or(
+        `username.ilike.%${search}%,full_name.ilike.%${search}%`
+      );
+    }
+
+    const {
+      data: users,
+      count,
+      error,
+    } = await query.order("username", { ascending: true }).range(from, to);
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("usersListTable");
+    if (!users || users.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" style="text-align: center;">Tidak ada data ditemukan.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = users
+      .map(
+        (user) =>
+          `<tr>
+            <td>${user.username}</td>
+            <td>${user.full_name}</td>
+            <td><span class="role-badge role-${
+              user.role
+            }">${user.role.toUpperCase()}</span></td>
+            <td>${user.phone || "-"}</td>
+            <td>
+              <div style="display: flex; gap: 5px;">
+                <button class="btn btn-sm" onclick="editUser('${user.id}')" ${
+            user.id == currentUser.id ? "disabled" : ""
+          }><i class="fas fa-edit"></i></button>
+                <button class="btn btn-sm text-danger" onclick="deleteUser('${
+                  user.id
+                }')" ${
+            user.id == currentUser.id ? "disabled" : ""
+          }><i class="fas fa-trash"></i></button>
+              </div>
+            </td>
+          </tr>`
+      )
+      .join("");
+
+    document.getElementById("usersPagination").innerHTML = renderPaginationUI(
+      count,
+      page,
+      "updateUsersPage"
+    );
+  } catch (error) {
+    console.error("Load Users error:", error);
+    showNotification("Gagal memuat daftar user", "error");
   }
 }
 
@@ -1850,56 +2081,16 @@ async function editUser(id) {
     if (error) throw error;
 
     showModal("newUserModal");
+    document.querySelector("#newUserModal h3").textContent = "Edit User";
+    document.getElementById("userId").value = user.id;
     document.getElementById("newUsername").value = user.username;
     document.getElementById("newPassword").value = user.password;
     document.getElementById("newName").value = user.full_name;
     document.getElementById("newRole").value = user.role;
     document.getElementById("newPhone").value = user.phone || "";
-
-    // Change modal title and button for edit
-    document.querySelector("#newUserModal h3").textContent = "Edit User";
-    document.querySelector("#newUserModal .btn-primary").textContent =
-      "Update User";
-    document.querySelector("#newUserModal .btn-primary").onclick = () =>
-      updateUser(id);
-  } catch (err) {
-    showNotification("Gagal memuat data user", "error");
-  }
-}
-
-async function updateUser(id) {
-  const username = document.getElementById("newUsername").value;
-  const password = document.getElementById("newPassword").value;
-  const nama = document.getElementById("newName").value;
-  const role = document.getElementById("newRole").value;
-  const telepon = document.getElementById("newPhone").value;
-
-  try {
-    const { error } = await db
-      .from("profiles")
-      .update({
-        username,
-        password,
-        full_name: nama,
-        role,
-        phone: telepon,
-      })
-      .eq("id", id);
-
-    if (error) throw error;
-
-    showNotification("User berhasil diupdate", "success");
-    closeModal("newUserModal");
-    // Reset modal state
-    document.querySelector("#newUserModal h3").textContent = "Tambah User Baru";
-    document.querySelector("#newUserModal .btn-primary").textContent =
-      "Simpan User";
-    document.querySelector("#newUserModal .btn-primary").onclick =
-      createNewUser;
-
-    await loadUsersList();
   } catch (error) {
-    showNotification("Gagal update user", "error");
+    showNotification("Gagal mengambil data user", "error");
+    console.error("Edit User error:", error);
   }
 }
 
