@@ -591,9 +591,12 @@ async function loadWorkOrders(page = 1, search = "") {
 
     let query = db
       .from("work_orders")
-      .select("*, customers!inner(name), profiles(full_name)", {
-        count: "exact",
-      });
+      .select(
+        "*, customers!inner(name), profiles!work_orders_technician_id_fkey(full_name)",
+        {
+          count: "exact",
+        }
+      );
 
     if (search) {
       query = query.or(
