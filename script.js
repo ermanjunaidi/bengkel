@@ -117,6 +117,15 @@ function formatCurrency(amount) {
   return "Rp " + (parseFloat(amount) || 0).toLocaleString("id-ID");
 }
 
+function maskCurrency(el) {
+  let value = el.value.replace(/\D/g, "");
+  el.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function unmaskCurrency(value) {
+  return parseFloat(value.replace(/\./g, "")) || 0;
+}
+
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.add("show");
@@ -1143,7 +1152,10 @@ async function showWorkOrderModal(id = null) {
       document.getElementById("woKeluhan").value = order.complaint;
       document.getElementById("woSparepart").value = order.notes || "";
       document.getElementById("woStatus").value = order.status;
-      document.getElementById("woTotalCost").value = order.total_cost;
+      const costEl = document.getElementById("woTotalCost");
+      costEl.value = (order.total_cost || 0)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       document.getElementById("woTeknisi").value =
         techniciansCache.find((t) => t.id === order.technician_id)?.username ||
         "";
@@ -1212,7 +1224,9 @@ async function submitWorkOrder() {
   const sparepart = document.getElementById("woSparepart").value;
   const teknisi = document.getElementById("woTeknisi").value;
   const status = document.getElementById("woStatus").value;
-  const totalCost = document.getElementById("woTotalCost").value;
+  const totalCost = unmaskCurrency(
+    document.getElementById("woTotalCost").value
+  );
   const estimasi = document.getElementById("woEstimasi").value;
   const paymentStatus = document.getElementById("woPaymentStatus").value;
 
@@ -1234,7 +1248,7 @@ async function submitWorkOrder() {
       notes: sparepart,
       technician_id: techProfile?.id,
       status: status,
-      total_cost: parseFloat(totalCost) || 0,
+      total_cost: totalCost,
       date_out: estimasi || null,
       payment_status: paymentStatus,
     };
@@ -1333,8 +1347,9 @@ async function submitNewItem() {
   const nama = document.getElementById("itemName").value;
   const kategori = document.getElementById("itemCat").value;
   const stok = document.getElementById("itemStok").value;
-  const beli = document.getElementById("itemBeli").value;
-  const jual = document.getElementById("itemJual").value;
+  const minStok = document.getElementById("itemMin").value;
+  const beli = unmaskCurrency(document.getElementById("itemBeli").value);
+  const jual = unmaskCurrency(document.getElementById("itemJual").value);
 
   if (!nama) {
     showNotification("Nama barang wajib diisi", "warning");
@@ -1347,8 +1362,9 @@ async function submitNewItem() {
       name: nama,
       category: kategori,
       stock: parseInt(stok) || 0,
-      buy_price: parseFloat(beli) || 0,
-      sell_price: parseFloat(jual) || 0,
+      min_stock: parseInt(minStok) || 0,
+      buy_price: beli,
+      sell_price: jual,
       part_code: "ITEM-" + Date.now().toString().slice(-6), // Generate simple code
     });
 

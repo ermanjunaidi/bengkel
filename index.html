@@ -601,7 +601,7 @@
               </div>
               <div class="form-group flex-1">
                 <label>Total Biaya (Rp)</label>
-                <input type="number" id="woTotalCost" class="form-control" value="0">
+                <input type="text" id="woTotalCost" class="form-control" value="0" oninput="maskCurrency(this)">
               </div>
             </div>
             <div class="form-row">
@@ -693,6 +693,52 @@
         <div class="modal-footer">
           <button class="btn" data-modal="stockModal">Batal</button>
           <button class="btn btn-primary" onclick="submitStockUpdate()">Update Stok</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Item Modal (Inventory) -->
+    <div class="modal" id="newItemModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Tambah Barang Baru</h3>
+          <button class="close-modal" data-modal="newItemModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="newItemForm">
+            <div class="form-group">
+              <label>Nama Barang *</label>
+              <input type="text" id="itemName" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Kategori</label>
+              <input type="text" id="itemCat" class="form-control" placeholder="Oli, Sparepart, dll">
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Stok Awal</label>
+                <input type="number" id="itemStok" class="form-control" value="0">
+              </div>
+              <div class="form-group flex-1">
+                <label>Batas Stok Minim</label>
+                <input type="number" id="itemMin" class="form-control" value="5">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Harga Beli (Rp)</label>
+                <input type="text" id="itemBeli" class="form-control" value="0" oninput="maskCurrency(this)">
+              </div>
+              <div class="form-group flex-1">
+                <label>Harga Jual (Rp)</label>
+                <input type="text" id="itemJual" class="form-control" value="0" oninput="maskCurrency(this)">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal="newItemModal">Batal</button>
+          <button class="btn btn-primary" onclick="submitNewItem()">Simpan Barang</button>
         </div>
       </div>
     </div>
