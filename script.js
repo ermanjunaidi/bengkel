@@ -25,6 +25,14 @@ let currentWorkOrderId = null;
 let customersCache = null;
 let techniciansCache = null;
 
+const PAGE_SIZE = 10;
+let paginationState = {
+  workorders: { page: 1, search: "" },
+  customers: { page: 1, search: "" },
+  inventory: { page: 1, search: "" },
+  posts: { page: 1, search: "" },
+};
+
 // Permission Matrix
 const PERMISSIONS = {
   admin: {
@@ -150,6 +158,52 @@ function transformImageUrl(url) {
   }
 
   return directUrl;
+}
+
+function renderPaginationUI(totalCount, currentPage, onPageChange) {
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  if (totalPages <= 1) return "";
+
+  let buttons = "";
+  for (let i = 1; i <= totalPages; i++) {
+    buttons += `<button class="btn btn-sm ${
+      i === currentPage ? "btn-primary" : ""
+    }" onclick="${onPageChange}(${i})">${i}</button>`;
+  }
+
+  return `
+    <div class="pagination-container" style="display: flex; gap: 5px; margin-top: 20px; justify-content: flex-end; align-items: center;">
+      <small style="margin-right: 10px; color: var(--text-muted);">Halaman ${currentPage} dari ${totalPages} (${totalCount} item)</small>
+      <button class="btn btn-sm" ${
+        currentPage === 1 ? "disabled" : ""
+      } onclick="${onPageChange}(${currentPage - 1})">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      ${buttons}
+      <button class="btn btn-sm" ${
+        currentPage === totalPages ? "disabled" : ""
+      } onclick="${onPageChange}(${currentPage + 1})">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  `;
+}
+
+function renderSearchUI(moduleName, onSearchChange, placeholder = "Cari...") {
+  return `
+    <div class="search-container" style="margin-bottom: 20px;">
+      <div class="form-group" style="max-width: 300px; margin-bottom: 0;">
+        <div style="position: relative;">
+          <input type="text" class="form-control" placeholder="${placeholder}" 
+            value="${paginationState[moduleName].search}"
+            onkeyup="if(event.key === 'Enter') ${onSearchChange}(this.value)"
+            onblur="${onSearchChange}(this.value)"
+            style="padding-left: 35px;">
+          <i class="fas fa-search" style="position: absolute; left: 12px; top: 12px; color: var(--text-muted);"></i>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function showModal(modalId) {
@@ -485,105 +539,326 @@ async function updateDashboardData() {
   }
 }
 
-async function loadWorkOrders() {
-  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Manajemen Work Orders</h3></div><div class="card-body"><div style="margin-bottom: 20px;">${
-    checkPermission("workorders", "create")
-      ? `<button class="btn btn-primary" onclick="showWorkOrderModal()"><i class="fas fa-plus"></i> Tambah Work Order</button>`
-      : ""
-  }</div><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Tanggal</th><th>Customer</th><th>Keluhan</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="workOrdersTable"><tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr></tbody></table></div></div></div>`;
+async function loadWorkOrders(page = 1, search = "") {
+  paginationState.workorders.page = page;
+  paginationState.workorders.search = search;
+
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Manajemen Work Orders</h3>
+      </div>
+      <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+          ${
+            checkPermission("workorders", "create")
+              ? `<button class="btn btn-primary" onclick="showWorkOrderModal()"><i class="fas fa-plus"></i> Tambah Work Order</button>`
+              : "<div></div>"
+          }
+          ${renderSearchUI(
+            "workorders",
+            "updateWorkOrdersSearch",
+            "Cari No. WO atau Pelanggan..."
+          )}
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tanggal</th>
+                <th>Customer</th>
+                <th>Keluhan</th>
+                <th>Status</th>
+                <th>Teknisi</th>
+                <th>Total</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="workOrdersTable">
+              <tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="workOrdersPagination"></div>
+      </div>
+    </div>
+  `;
+
   try {
-    const { data: orders, error } = await db
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = db
       .from("work_orders")
-      .select(
-        "*, customers(name), profiles!work_orders_technician_id_fkey(full_name)"
-      )
-      .order("created_at", { ascending: false });
+      .select("*, customers!inner(name), profiles(full_name)", {
+        count: "exact",
+      });
+
+    if (search) {
+      query = query.or(
+        `complaint.ilike.%${search}%,status.ilike.%${search}%,id.eq.${
+          parseInt(search) || 0
+        },customers.name.ilike.%${search}%`
+      );
+    }
+
+    const {
+      data: orders,
+      count,
+      error,
+    } = await query.order("created_at", { ascending: false }).range(from, to);
 
     if (error) throw error;
 
     const tableBody = document.getElementById("workOrdersTable");
+    if (!orders || orders.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="8" style="text-align: center;">Tidak ada data ditemukan.</td></tr>';
+      return;
+    }
+
     tableBody.innerHTML = orders
       .map(
         (order) =>
-          `<tr><td>#${order.id}</td><td>${new Date(
-            order.date_in
-          ).toLocaleDateString()}</td><td>${
-            order.customers?.name || "-"
-          }</td><td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
-            order.complaint || ""
-          }</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+          `<tr>
+            <td>#${order.id}</td>
+            <td>${new Date(order.date_in).toLocaleDateString("id-ID")}</td>
+            <td>${order.customers?.name || "-"}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
+              order.complaint || ""
+            }</td>
+            <td><span class="status-badge status-${order.status.toLowerCase()}">${
             order.status
-          }</span></td><td>${
-            order.profiles?.full_name || "-"
-          }</td><td>${formatCurrency(
-            order.total_cost
-          )}</td><td><div style="display: flex; gap: 5px;"><button class="btn btn-sm" onclick="showInvoiceModal(${
-            order.id
-          })"><i class="fas fa-eye"></i></button><button class="btn btn-sm" onclick="showWorkOrderModal(${
-            order.id
-          })"><i class="fas fa-edit"></i></button></div></td></tr>`
+          }</span></td>
+            <td>${order.profiles?.full_name || "-"}</td>
+            <td>${formatCurrency(order.total_cost)}</td>
+            <td>
+              <div style="display: flex; gap: 5px;">
+                <button class="btn btn-sm" onclick="showInvoiceModal(${
+                  order.id
+                })"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-sm" onclick="showWorkOrderModal(${
+                  order.id
+                })"><i class="fas fa-edit"></i></button>
+              </div>
+            </td>
+          </tr>`
       )
       .join("");
+
+    document.getElementById("workOrdersPagination").innerHTML =
+      renderPaginationUI(count, page, "updateWorkOrdersPage");
   } catch (error) {
     showNotification("Gagal memuat work orders", "error");
     console.error("Load Work Orders error:", error);
   }
 }
 
-async function loadCustomers() {
-  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Daftar Pelanggan</h3></div><div class="card-body"><div style="margin-bottom: 20px;"><button class="btn btn-primary" onclick="showCustomerModal()"><i class="fas fa-plus"></i> Tambah Pelanggan</button></div><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Nama</th><th>Telepon</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody id="customersTable"><tr><td colspan="5" style="text-align: center;">Memuat data...</td></tr></tbody></table></div></div></div>`;
+async function updateWorkOrdersPage(page) {
+  await loadWorkOrders(page, paginationState.workorders.search);
+}
+
+async function updateWorkOrdersSearch(search) {
+  await loadWorkOrders(1, search);
+}
+
+async function loadCustomers(page = 1, search = "") {
+  paginationState.customers.page = page;
+  paginationState.customers.search = search;
+
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Daftar Pelanggan</h3>
+      </div>
+      <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="showCustomerModal()"><i class="fas fa-plus"></i> Tambah Pelanggan</button>
+          ${renderSearchUI(
+            "customers",
+            "updateCustomersSearch",
+            "Cari Nama atau Telepon..."
+          )}
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nama</th>
+                <th>Telepon</th>
+                <th>Alamat</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="customersTable">
+              <tr><td colspan="5" style="text-align: center;">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="customersPagination"></div>
+      </div>
+    </div>
+  `;
+
   try {
-    const { data: customers, error } = await db
-      .from("customers")
-      .select("*")
-      .order("name", { ascending: true });
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = db.from("customers").select("*", { count: "exact" });
+
+    if (search) {
+      query = query.or(
+        `name.ilike.%${search}%,phone.ilike.%${search}%,address.ilike.%${search}%`
+      );
+    }
+
+    const {
+      data: customers,
+      count,
+      error,
+    } = await query.order("name", { ascending: true }).range(from, to);
 
     if (error) throw error;
 
-    document.getElementById("customersTable").innerHTML = customers
+    const tableBody = document.getElementById("customersTable");
+    if (!customers || customers.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="5" style="text-align: center;">Tidak ada data ditemukan.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = customers
       .map(
         (c) =>
-          `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.phone}</td><td>${
-            c.address || "-"
-          }</td><td><button class="btn btn-sm" onclick="showCustomerModal(${
-            c.id
-          })"><i class="fas fa-edit"></i></button></td></tr>`
+          `<tr>
+            <td>${c.id}</td>
+            <td>${c.name}</td>
+            <td>${c.phone}</td>
+            <td>${c.address || "-"}</td>
+            <td>
+              <button class="btn btn-sm" onclick="showCustomerModal(${
+                c.id
+              })"><i class="fas fa-edit"></i></button>
+            </td>
+          </tr>`
       )
       .join("");
+
+    document.getElementById("customersPagination").innerHTML =
+      renderPaginationUI(count, page, "updateCustomersPage");
   } catch (error) {
     showNotification("Gagal memuat daftar pelanggan", "error");
     console.error("Load Customers error:", error);
   }
 }
 
-async function loadInventory() {
-  contentArea.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Inventaris Barang</h3></div><div class="card-body"><div style="margin-bottom: 20px;"><button class="btn btn-primary" onclick="showNewItemModal()"><i class="fas fa-plus"></i> Tambah Item</button></div><div class="table-responsive"><table class="table"><thead><tr><th>Kode</th><th>Nama Barang</th><th>Kategori</th><th>Stok</th><th>Harga Jual</th><th>Aksi</th></tr></thead><tbody id="inventoryTable"></tbody></table></div></div></div>`;
+async function updateCustomersPage(page) {
+  await loadCustomers(page, paginationState.customers.search);
+}
+
+async function updateCustomersSearch(search) {
+  await loadCustomers(1, search);
+}
+
+async function loadInventory(page = 1, search = "") {
+  paginationState.inventory.page = page;
+  paginationState.inventory.search = search;
+
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Invetaris Barang</h3>
+      </div>
+      <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="showNewItemModal()"><i class="fas fa-plus"></i> Tambah Item</button>
+          ${renderSearchUI(
+            "inventory",
+            "updateInventorySearch",
+            "Cari Nama atau Kategori..."
+          )}
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Nama Barang</th>
+                <th>Kategori</th>
+                <th>Stok</th>
+                <th>Harga Jual</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTable">
+              <tr><td colspan="6" style="text-align: center;">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="inventoryPagination"></div>
+      </div>
+    </div>
+  `;
+
   try {
-    const { data: inventory, error } = await db
-      .from("inventory")
-      .select("*")
-      .order("name", { ascending: true });
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = db.from("inventory").select("*", { count: "exact" });
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%`);
+    }
+
+    const {
+      data: items,
+      count,
+      error,
+    } = await query.order("name", { ascending: true }).range(from, to);
 
     if (error) throw error;
 
-    document.getElementById("inventoryTable").innerHTML = inventory
+    const tableBody = document.getElementById("inventoryTable");
+    if (!items || items.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="7" style="text-align: center;">Tidak ada data ditemukan.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = items
       .map(
         (item) =>
-          `<tr><td>${item.part_code}</td><td>${item.name}</td><td>${
-            item.category || "-"
-          }</td><td class="${
-            item.stock <= item.min_stock ? "text-danger" : ""
-          }">${item.stock}</td><td>${formatCurrency(
-            item.sell_price
-          )}</td><td><button class="btn btn-sm" onclick="updateStock('${
-            item.id
-          }')"><i class="fas fa-plus-minus"></i></button></td></tr>`
+          `<tr>
+            <td>${item.part_code}</td>
+            <td>${item.name}</td>
+            <td><span class="badge Lunas">${item.category}</span></td>
+            <td>${item.stock}</td>
+            <td>${formatCurrency(item.sell_price)}</td>
+            <td>
+              <button class="btn btn-sm" onclick="showStockUpdateModal(${
+                item.id
+              })"><i class="fas fa-plus-minus"></i> Stok</button>
+            </td>
+          </tr>`
       )
       .join("");
+
+    document.getElementById("inventoryPagination").innerHTML =
+      renderPaginationUI(count, page, "updateInventoryPage");
   } catch (error) {
     showNotification("Gagal memuat inventaris", "error");
     console.error("Load Inventory error:", error);
   }
+}
+
+async function updateInventoryPage(page) {
+  await loadInventory(page, paginationState.inventory.search);
+}
+
+async function updateInventorySearch(search) {
+  await loadInventory(1, search);
 }
 
 async function loadReports() {
@@ -1629,18 +1904,25 @@ async function updateUser(id) {
 }
 
 /** News & Posts Functions **/
-async function loadPublicPosts() {
+async function loadPublicPosts(page = 1) {
   const postsGrid = document.getElementById("postsGrid");
   const newsSection = document.getElementById("newsSection");
   if (!postsGrid) return;
 
   try {
-    const { data: posts, error } = await db
+    const from = (page - 1) * 6; // Public page uses 6 items
+    const to = from + 5;
+
+    const {
+      data: posts,
+      count,
+      error,
+    } = await db
       .from("posts")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("is_public", true)
       .order("created_at", { ascending: false })
-      .limit(6);
+      .range(from, to);
 
     if (error) throw error;
 
@@ -1673,6 +1955,22 @@ async function loadPublicPosts() {
       `
         )
         .join("");
+
+      // Simple pagination for public landing page
+      const totalPages = Math.ceil(count / 6);
+      if (totalPages > 1) {
+        let pagHtml = `<div class="pagination-container" style="display: flex; gap: 10px; margin-top: 40px; justify-content: center; width: 100%;">`;
+        if (page > 1)
+          pagHtml += `<button class="btn btn-outline" onclick="loadPublicPosts(${
+            page - 1
+          })">Sebelumnya</button>`;
+        if (page < totalPages)
+          pagHtml += `<button class="btn btn-primary" onclick="loadPublicPosts(${
+            page + 1
+          })">Berikutnya</button>`;
+        pagHtml += `</div>`;
+        postsGrid.insertAdjacentHTML("afterend", pagHtml);
+      }
     } else {
       newsSection.style.display = "none";
     }
@@ -1681,17 +1979,25 @@ async function loadPublicPosts() {
   }
 }
 
-async function loadPostsManagement() {
+async function loadPostsManagement(page = 1, search = "") {
+  paginationState.posts.page = page;
+  paginationState.posts.search = search;
+
   contentArea.innerHTML = `
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Manajemen Berita & Update</h3>
       </div>
       <div class="card-body">
-        <div style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
           <button class="btn btn-primary" onclick="showPostModal()">
             <i class="fas fa-plus"></i> Buat Postingan Baru
           </button>
+          ${renderSearchUI(
+            "posts",
+            "updatePostsSearch",
+            "Cari Judul atau Isi..."
+          )}
         </div>
         <div class="table-responsive">
           <table class="table">
@@ -1708,15 +2014,26 @@ async function loadPostsManagement() {
             </tbody>
           </table>
         </div>
+        <div id="postsPagination"></div>
       </div>
     </div>
   `;
 
   try {
-    const { data: posts, error } = await db
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = db.from("posts").select("*", { count: "exact" });
+
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+    }
+
+    const {
+      data: posts,
+      count,
+      error,
+    } = await query.order("created_at", { ascending: false }).range(from, to);
 
     if (error) throw error;
 
@@ -1754,9 +2071,23 @@ async function loadPostsManagement() {
     `
       )
       .join("");
+
+    document.getElementById("postsPagination").innerHTML = renderPaginationUI(
+      count,
+      page,
+      "updatePostsPage"
+    );
   } catch (err) {
     showNotification("Gagal memuat daftar berita", "error");
   }
+}
+
+async function updatePostsPage(page) {
+  await loadPostsManagement(page, paginationState.posts.search);
+}
+
+async function updatePostsSearch(search) {
+  await loadPostsManagement(1, search);
 }
 
 async function showPostModal(id = null) {

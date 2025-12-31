@@ -1082,6 +1082,53 @@ body {
     font-size: 32px;
   }
 }
+
+/* Pagination Styles */
+.pagination-container {
+  display: flex;
+  gap: 8px;
+  margin-top: 25px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pagination-container .btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  min-width: 35px;
+  justify-content: center;
+}
+
+.pagination-container .btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination-container .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-container small {
+  font-weight: 500;
+  margin-right: auto;
+}
+
+/* Search Bar Styles */
+.search-container .form-control {
+  background: var(--bg-main) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+  transition: var(--transition);
+}
+
+.search-container .form-control:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;
