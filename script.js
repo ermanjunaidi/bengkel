@@ -1,13 +1,21 @@
 // Google Apps Script REST API
 const GAS_API_URL =
-  window.GAS_API_URL || "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+  window.GAS_API_URL || "";
 
 async function apiRequest(payload) {
-  if (!GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED")) {
+  if (!GAS_API_URL) {
     throw new Error(
-      "URL Google Apps Script belum diatur. Isi window.GAS_API_URL di index.html."
+      "API URL belum diatur. Periksa file index.html dan isi window.GAS_API_URL dengan URL Google Apps Script yang benar."
     );
   }
+  
+  if (GAS_API_URL.includes("YOUR_DEPLOYED")) {
+    throw new Error(
+      "URL Google Apps Script belum diatur. Ganti placeholder di index.html dengan URL deployment yang sebenarnya."
+    );
+  }
+
+  console.log("API Request:", { url: GAS_API_URL, payload });
 
   const response = await fetch(GAS_API_URL, {
     method: "POST",
@@ -20,6 +28,8 @@ async function apiRequest(payload) {
   });
 
   const result = await response.json();
+  console.log("API Response:", result);
+
   if (!result.success) {
     throw new Error(result.error || "Request API gagal");
   }
@@ -379,15 +389,29 @@ async function handleLogin(e) {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
 
+  if (!username || !password) {
+    showNotification("Username dan password harus diisi", "error");
+    return;
+  }
+
   try {
-    const { data: user, error } = await db
+    console.log("Attempting login for:", username);
+    const { data: user, error, count } = await db
       .from("profiles")
       .select("*")
       .eq("username", username)
       .eq("password", password)
       .single();
 
+    console.log("Login response:", { user, error, count });
+
     if (error) {
+      console.error("Login error:", error);
+      showNotification("Username atau password salah", "error");
+      return;
+    }
+
+    if (!user) {
       showNotification("Username atau password salah", "error");
       return;
     }
