@@ -801,7 +801,10 @@
 
 
     <!-- JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      window.GAS_API_URL =
+        "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="script.js"></script>
   </body>

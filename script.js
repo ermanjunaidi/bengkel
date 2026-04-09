@@ -1,21 +1,176 @@
-// Supabase Configuration
-const SUPABASE_URL = "https://lbhutmuchalhpxurcfqe.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiaHV0bXVjaGFsaHB4dXJjZnFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjU0MzgsImV4cCI6MjA4Mjc0MTQzOH0.G3e8A3ozqS50VFr_YntCKTShaR-yRZ4tyifST_f0jow";
+// Google Apps Script REST API
+const GAS_API_URL =
+  window.GAS_API_URL || "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
 
-let db;
-
-try {
-  if (window.supabase) {
-    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } else {
-    console.error(
-      "Supabase SDK not found. Please check index.html script tag."
+async function apiRequest(payload) {
+  if (!GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED")) {
+    throw new Error(
+      "URL Google Apps Script belum diatur. Isi window.GAS_API_URL di index.html."
     );
   }
-} catch (err) {
-  console.error("Error initializing Supabase:", err);
+
+  const response = await fetch(GAS_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "query",
+      ...payload,
+      audit_user: currentUser?.username || "guest",
+    }),
+  });
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || "Request API gagal");
+  }
+  return result;
 }
+
+class RestQueryBuilder {
+  constructor(table) {
+    this.table = table;
+    this.operation = "select";
+    this.columns = "*";
+    this.options = {};
+    this.filters = [];
+    this.orFilters = [];
+    this.orderBy = null;
+    this.rangeFrom = null;
+    this.rangeTo = null;
+    this.limitCount = null;
+    this.singleMode = false;
+    this.payload = null;
+  }
+
+  select(columns = "*", options = {}) {
+    this.operation = "select";
+    this.columns = columns;
+    this.options = options;
+    return this;
+  }
+
+  eq(field, value) {
+    this.filters.push({ field, operator: "eq", value });
+    return this;
+  }
+
+  gte(field, value) {
+    this.filters.push({ field, operator: "gte", value });
+    return this;
+  }
+
+  lte(field, value) {
+    this.filters.push({ field, operator: "lte", value });
+    return this;
+  }
+
+  or(expression) {
+    this.orFilters = expression
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const parts = item.split(".");
+        const operator = parts[parts.length - 2];
+        let value = parts[parts.length - 1];
+        const field = parts.slice(0, parts.length - 2).join(".");
+
+        if (operator === "ilike") {
+          value = value.replace(/^%|%$/g, "");
+        } else if (operator === "eq" && /^\d+$/.test(value)) {
+          value = Number(value);
+        }
+
+        return { field, operator, value };
+      });
+    return this;
+  }
+
+  order(field, options = {}) {
+    this.orderBy = { field, ascending: options.ascending !== false };
+    return this;
+  }
+
+  range(from, to) {
+    this.rangeFrom = from;
+    this.rangeTo = to;
+    return this;
+  }
+
+  limit(count) {
+    this.limitCount = count;
+    return this;
+  }
+
+  single() {
+    this.singleMode = true;
+    return this;
+  }
+
+  insert(data) {
+    this.operation = "insert";
+    this.payload = data;
+    return this;
+  }
+
+  update(data) {
+    this.operation = "update";
+    this.payload = data;
+    return this;
+  }
+
+  upsert(data) {
+    this.operation = "upsert";
+    this.payload = data;
+    return this;
+  }
+
+  delete() {
+    this.operation = "delete";
+    return this;
+  }
+
+  async execute() {
+    try {
+      const result = await apiRequest({
+        table: this.table,
+        operation: this.operation,
+        columns: this.columns,
+        options: this.options,
+        filters: this.filters,
+        orFilters: this.orFilters,
+        orderBy: this.orderBy,
+        rangeFrom: this.rangeFrom,
+        rangeTo: this.rangeTo,
+        limit: this.limitCount,
+        single: this.singleMode,
+        data: this.payload,
+      });
+
+      return {
+        data: result.data ?? null,
+        count: result.count ?? null,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        data: null,
+        count: null,
+        error,
+      };
+    }
+  }
+
+  then(resolve, reject) {
+    return this.execute().then(resolve, reject);
+  }
+}
+
+const db = {
+  from(table) {
+    return new RestQueryBuilder(table);
+  },
+};
 
 // State
 let currentUser = null;
@@ -254,7 +409,7 @@ async function handleLogin(e) {
       showNotification("Login berhasil!", "success");
     }
   } catch (error) {
-    showNotification("Terjadi kesalahan. Coba lagi.", "error");
+    showNotification(error.message || "Terjadi kesalahan. Coba lagi.", "error");
     console.error("Login error:", error);
   }
 }
@@ -468,7 +623,7 @@ async function loadDashboard() {
 
 async function updateDashboardData() {
   try {
-    // Get stats from Supabase
+    // Get stats from REST API
     const { data: woData, error: woError } = await db
       .from("work_orders")
       .select("status, total_cost");
@@ -2519,7 +2674,7 @@ async function submitPost() {
     }
 
     if (error) {
-      console.error("Supabase Save Post Error:", error);
+      console.error("Save Post API Error:", error);
       throw error;
     }
 
@@ -2533,7 +2688,7 @@ async function submitPost() {
   } catch (err) {
     console.error("Save post catch error:", err);
     showNotification(
-      "Gagal menyimpan postingan. Pastikan tabel 'posts' sudah dibuat di Supabase.",
+      "Gagal menyimpan postingan. Pastikan sheet 'Posts' tersedia di Apps Script.",
       "error"
     );
   }
