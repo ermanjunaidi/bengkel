@@ -812,6 +812,18 @@ body {
   }
 }
 
+@media (max-width: 576px) {
+  #topbarUsername {
+    display: none;
+  }
+  .topbar > div:last-child {
+    gap: 10px !important;
+  }
+  .user-info {
+    gap: 8px !important;
+  }
+}
+
 /* Landing Page Styles */
 .landing-page {
   background: white;
