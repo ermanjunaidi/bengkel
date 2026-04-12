@@ -220,7 +220,7 @@ function seedSheet_(table, sheet) {
 
   if (table === "settings") {
     sheet.getRange(2, 1, 4, 2).setValues([
-      ["company_name", "Bengkel Pintu Mobil Hoky"],
+      ["company_name", "Sistem Bengkel"],
       ["company_address", "Jl. Contoh No. 123"],
       ["company_phone", "08123456789"],
       ["whatsapp_api_key", "YOUR_API_KEY_HERE"],

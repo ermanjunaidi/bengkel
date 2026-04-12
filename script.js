@@ -581,7 +581,7 @@ async function loadPage(page) {
     posts: "Manajemen Berita",
   };
   document.getElementById("pageTitle").textContent =
-    pageTitles[page] || "Pintu Mobil Hoky";
+    pageTitles[page] || "Sistem Bengkel";
   if (!checkPermission(page, "view")) {
     contentArea.innerHTML = `<div class="card" style="text-align: center; padding: 60px 20px;"><div style="font-size: 64px; color: var(--danger); margin-bottom: 20px;"><i class="fas fa-shield-alt"></i></div><h2 style="margin-bottom: 10px;">Akses Terbatas</h2><p style="color: var(--text-muted); margin-bottom: 25px;">Maaf, Anda tidak memiliki izin untuk melihat halaman ini.</p><div style="display: flex; justify-content: center;"><span class="role-badge role-${
       currentUser.role
