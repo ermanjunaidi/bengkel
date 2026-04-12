@@ -187,6 +187,7 @@ let currentUser = null;
 let currentPage = "dashboard";
 let userPermissions = {};
 let currentWorkOrderId = null;
+let currentOrderData = null;
 let customersCache = null;
 let techniciansCache = null;
 
@@ -1520,6 +1521,7 @@ async function showInvoiceModal(orderId) {
       .single();
 
     if (orderError) throw orderError;
+    currentOrderData = order;
 
     // Fetch company settings
     const { data: settingsData, error: settingsError } = await db
@@ -1647,28 +1649,56 @@ function downloadInvoice() {
   showNotification("Fitur download PDF dalam pengembangan", "info");
 }
 
-async function downloadInvoiceAsPNG() {
+async function sendInvoiceToWhatsApp() {
   const invoiceElement = document.getElementById("invoicePreview");
-  if (!invoiceElement) return;
+  if (!invoiceElement || !currentOrderData) return;
 
   try {
-    showNotification("Menyiapkan Gambar...", "info");
+    showNotification("Menyiapkan Gambar Invoice...", "info");
+    
+    // Scroll ke atas agar tidak terpotong jika sedang di tengah
+    const modalContent = document.querySelector("#invoiceModal .modal-content");
+    const oldScroll = modalContent.scrollTop;
+    modalContent.scrollTop = 0;
+
     const canvas = await html2canvas(invoiceElement, {
-      scale: 2, // Kualitas lebih tinggi
+      scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
+      logging: false,
     });
+    
+    modalContent.scrollTop = oldScroll;
 
+    // Download file
     const link = document.createElement("a");
     link.download = `Invoice-${currentWorkOrderId}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
 
     showNotification("Gambar berhasil diunduh!", "success");
-    showNotification("Silakan kirim file ini ke WhatsApp pelanggan.", "info");
+
+    // Persiapkan nomor WA
+    let phone = currentOrderData.customers?.phone || "";
+    if (phone.startsWith("0")) {
+      phone = "62" + phone.substring(1);
+    } else if (phone && !phone.startsWith("62")) {
+      phone = "62" + phone;
+    }
+
+    const message = encodeURIComponent(
+      `Halo *${currentOrderData.customers?.name || "Pelanggan"}*,\n\nBerikut adalah nota/invoice untuk pengerjaan *#${currentWorkOrderId}*.\n\nSilakan lampirkan gambar yang baru saja terunduh.\n\nTerima kasih.`
+    );
+
+    setTimeout(() => {
+      const waUrl = `https://wa.me/${phone}?text=${message}`;
+      window.open(waUrl, "_blank");
+      showNotification("Silakan PASTE gambar ke WhatsApp", "info");
+    }, 1500);
+
   } catch (error) {
-    console.error("Error generating PNG:", error);
-    showNotification("Gagal membuat gambar invoice", "error");
+    console.error("Error sending WhatsApp:", error);
+    showNotification("Gagal memproses gambar invoice", "error");
   }
 }
 
