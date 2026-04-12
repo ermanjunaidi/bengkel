@@ -197,6 +197,8 @@ let paginationState = {
   customers: { page: 1, search: "" },
   inventory: { page: 1, search: "" },
   posts: { page: 1, search: "" },
+  users: { page: 1, search: "" },
+  financial: { page: 1, search: "" },
 };
 
 // Permission Matrix
@@ -657,9 +659,8 @@ async function loadDashboard() {
     checkPermission("financial", "view")
       ? `<button class="btn btn-secondary" onclick="showFinancialReport()"><i class="fas fa-chart-line"></i> Laporan Keuangan</button>`
       : ""
-  }<button class="btn btn-secondary" onclick="showProfileModal()"><i class="fas fa-user"></i> Profile Saya</button></div></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-list-check text-primary"></i> Work Order Terbaru</h3></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Tanggal</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="recentOrdersTable"></tbody></table></div></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chart-area text-primary"></i> Grafik Performa</h3></div><div class="card-body"><canvas id="performanceChart" style="max-height: 300px;"></canvas></div></div>`;
+  }<button class="btn btn-secondary" onclick="showProfileModal()"><i class="fas fa-user"></i> Profile Saya</button></div></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-list-check text-primary"></i> Work Order Terbaru</h3></div><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>Tanggal</th><th>Status</th><th>Teknisi</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="recentOrdersTable"></tbody></table></div></div></div>`;
   await updateDashboardData();
-  loadPerformanceChart();
 }
 
 async function updateDashboardData() {
@@ -1674,11 +1675,16 @@ async function openDirectWhatsApp(orderId) {
 
     if (error) throw error;
 
-    let phone = order.customers?.phone || "";
+    let phone = String(order.customers?.phone || "").replace(/\D/g, "");
     if (phone.startsWith("0")) {
       phone = "62" + phone.substring(1);
     } else if (phone && !phone.startsWith("62")) {
       phone = "62" + phone;
+    }
+
+    if (!phone) {
+      showNotification("Nomor telepon tidak valid", "warning");
+      return;
     }
 
     const message = encodeURIComponent(
@@ -1686,7 +1692,11 @@ async function openDirectWhatsApp(orderId) {
     );
 
     const waUrl = `https://wa.me/${phone}?text=${message}`;
-    window.open(waUrl, "_blank");
+    const newWindow = window.open(waUrl, "_blank");
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+       // Popup blocker
+       window.location.href = waUrl;
+    }
   } catch (err) {
     console.error("Error direct WA:", err);
     showNotification("Gagal mengirim pesan WhatsApp", "error");
@@ -1723,21 +1733,33 @@ async function sendInvoiceToWhatsApp() {
     showNotification("Gambar berhasil diunduh!", "success");
 
     // Persiapkan nomor WA
-    let phone = currentOrderData.customers?.phone || "";
+    let phone = String(currentOrderData.customers?.phone || "").replace(/\D/g, "");
     if (phone.startsWith("0")) {
       phone = "62" + phone.substring(1);
     } else if (phone && !phone.startsWith("62")) {
       phone = "62" + phone;
     }
 
+    if (!phone) {
+      showNotification("Nomor telepon pelanggan tidak ditemukan", "warning");
+      return;
+    }
+
     const message = encodeURIComponent(
-      `Halo *${currentOrderData.customers?.name || "Pelanggan"}*,\n\nBerikut adalah nota/invoice untuk pengerjaan *#${currentWorkOrderId}*.\n\nSilakan lampirkan gambar yang baru saja terunduh.\n\nTerima kasih.`
+      `Halo *${currentOrderData.customers?.name || "Pelanggan"}*,\n\nBerikut adalah nota/invoice untuk pengerjaan ID: *${currentWorkOrderId}*.\n\nSilakan lampirkan gambar yang baru saja terunduh.\n\nTerima kasih.`
     );
 
     setTimeout(() => {
       const waUrl = `https://wa.me/${phone}?text=${message}`;
-      window.open(waUrl, "_blank");
-      showNotification("Silakan PASTE gambar ke WhatsApp", "info");
+      const newWindow = window.open(waUrl, "_blank");
+      
+      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+         // Popup blocker or mobile constraint
+         showNotification("Membuka WhatsApp...", "info");
+         window.location.href = waUrl;
+      } else {
+         showNotification("Silakan PASTE gambar ke WhatsApp", "info");
+      }
     }, 1500);
 
   } catch (error) {
@@ -1884,7 +1906,8 @@ async function loadUsersPage(page = 1, search = "") {
 }
 
 async function updateUsersPage(page) {
-  await loadUsersPage(page, paginationState.users.search);
+  paginationState.users.page = page;
+  await loadUsersList(page, paginationState.users.search);
 }
 
 async function updateUsersSearch(search) {
@@ -1997,45 +2020,6 @@ async function updateProfile() {
   }
 }
 
-function loadPerformanceChart() {
-  const ctx = document.getElementById("performanceChart");
-  if (!ctx) return;
-  new Chart(ctx.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"],
-      datasets: [
-        {
-          label: "Work Orders",
-          data: [12, 19, 15, 25, 22, 30],
-          backgroundColor: "#2563eb",
-        },
-        {
-          label: "Revenue",
-          data: [1200000, 1900000, 1500000, 2500000, 2200000, 3000000],
-          backgroundColor: "#10b981",
-          yAxisID: "y1",
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          type: "linear",
-          position: "left",
-          title: { display: true, text: "Jumlah Order" },
-        },
-        y1: {
-          type: "linear",
-          position: "right",
-          title: { display: true, text: "Revenue (Rp)" },
-          grid: { drawOnChartArea: false },
-        },
-      },
-    },
-  });
-}
 
 function showNotification(message, type = "info") {
   // Silent filter for "processing" type messages to reduce clutter
@@ -2402,22 +2386,51 @@ async function submitStockUpdate() {
     showNotification("Gagal update stok", "error");
   }
 }
-async function loadFinancialData() {
+async function loadFinancialData(page = 1) {
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
   const tableBody = document.getElementById("financialTable");
-  tableBody.innerHTML =
-    '<tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr>';
+  
+  // Create table structure if it doesn't exist (since it's sometimes used for reportResults)
+  if (!tableBody) {
+    document.getElementById("reportResults").innerHTML = `
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tanggal</th>
+              <th>Pelanggan</th>
+              <th>Layanan</th>
+              <th>Status</th>
+              <th>Total</th>
+              <th>Pembayaran</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="financialTable"></tbody>
+        </table>
+      </div>
+      <div id="financialPagination"></div>
+    `;
+  }
+  
+  const targetTable = document.getElementById("financialTable");
+  targetTable.innerHTML = '<tr><td colspan="8" style="text-align: center;">Memuat data...</td></tr>';
+  
   try {
-    const { data: orders, error } = await db
+    const { data: orders, count, error } = await db
       .from("work_orders")
-      .select("*, customers(name)")
-      .order("date_in", { ascending: false });
+      .select("*, customers(name)", { count: "exact" })
+      .order("date_in", { ascending: false })
+      .range(from, to);
 
     if (error) throw error;
 
-    tableBody.innerHTML = orders
+    targetTable.innerHTML = orders
       .map(
         (order) =>
-          `<tr><td>#${order.id}</td><td>${new Date(
+          `<tr><td>${order.id}</td><td>${new Date(
             order.date_in
           ).toLocaleDateString()}</td><td>${
             order.customers?.name || "-"
@@ -2425,11 +2438,17 @@ async function loadFinancialData() {
             order.status
           }</span></td><td>${formatCurrency(order.total_cost)}</td><td>${
             order.payment_status
-          }</td><td><button class="btn btn-sm" onclick="showInvoiceModal(${
+          }</td><td><button class="btn btn-sm btn-secondary" onclick="showInvoiceModal(${
             order.id
-          })"><i class="fas fa-eye"></i></button></td></tr>`
+          })" title="Invoice"><i class="fas fa-file-invoice"></i></button></td></tr>`
       )
       .join("");
+
+    document.getElementById("financialPagination").innerHTML = renderPaginationUI(
+      count,
+      page,
+      "loadFinancialData"
+    );
   } catch (error) {
     showNotification("Gagal memuat data keuangan", "error");
     console.error("Load Financial Data error:", error);
