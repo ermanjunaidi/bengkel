@@ -664,109 +664,157 @@ body {
 /* Premium Invoice Styles */
 .invoice-container {
   background: white;
-  padding: 40px;
-  border: 1px solid #eee;
-  font-family: "Inter", sans-serif;
-  color: #333;
-  line-height: 1.6;
+  padding: 50px;
+  font-family: 'Inter', sans-serif;
+  color: #334155;
+  line-height: 1.5;
+  border: 1px solid #f1f5f9;
 }
 
 .invoice-header {
-  text-align: center;
-  margin-bottom: 30px;
-  border-bottom: 2px solid var(--primary);
-  padding-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 3px solid #f1f5f9;
+  padding-bottom: 30px;
+  margin-bottom: 40px;
 }
 
-.invoice-header .company-name {
-  font-size: 24px;
+.company-info .company-name {
+  font-size: 28px;
   font-weight: 800;
   color: var(--primary);
+  margin-bottom: 8px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: -0.5px;
 }
 
-.invoice-header .invoice-title {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 15px 0 5px;
+.company-info .company-address, 
+.company-info .company-phone {
+  font-size: 13px;
+  color: #64748b;
+  max-width: 250px;
+}
+
+.invoice-title-area {
+  text-align: right;
+}
+
+.invoice-title-area h1 {
+  font-size: 36px;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1;
+}
+
+.invoice-title-area .invoice-no {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+.invoice-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.info-block h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 5px;
+}
+
+.info-content {
+  font-size: 15px;
+  font-weight: 600;
   color: #1e293b;
 }
 
-.invoice-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-  margin-bottom: 30px;
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 40px;
 }
 
-.detail-row {
-  display: flex;
-  margin-bottom: 8px;
+.invoice-table th {
+  background: #f8fafc;
+  padding: 15px;
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.invoice-table td {
+  padding: 20px 15px;
+  border-bottom: 1px solid #f1f5f9;
   font-size: 14px;
 }
 
-.detail-label {
-  font-weight: 600;
-  width: 130px;
-  color: var(--secondary);
+.invoice-summary {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.invoice-container h3 {
-  font-size: 16px;
-  font-weight: 700;
-  border-left: 4px solid var(--primary);
-  padding-left: 10px;
-  margin: 20px 0 10px;
+.summary-box {
+  width: 300px;
 }
 
-.invoice-container .table {
-  width: 100%;
-  margin: 20px 0;
-  border-collapse: collapse;
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
 }
 
-.invoice-container .table th {
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 700;
-}
-
-.invoice-container .total {
-  text-align: right;
-  margin-top: 30px;
-  padding: 20px;
-  background: #f1f5f9;
-  border-radius: var(--radius-sm);
-  font-size: 18px;
+.summary-row.grand-total {
+  margin-top: 10px;
+  padding: 20px 0;
+  border-top: 2px solid #e2e8f0;
+  font-size: 20px;
   font-weight: 800;
-  color: var(--primary-dark);
+  color: var(--primary);
 }
 
-.signature {
+.invoice-footer {
+  margin-top: 60px;
+  padding-top: 30px;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.signature-section {
   display: flex;
   justify-content: space-between;
   margin-top: 50px;
-  padding: 0 40px;
+  padding: 0 50px;
 }
 
-.signature-box {
+.sig-box {
   text-align: center;
-  width: 200px;
 }
 
-.signature-line {
+.sig-line {
   margin-top: 60px;
-  border-bottom: 1px solid #333;
+  width: 180px;
+  border-bottom: 1px solid #cbd5e1;
+  margin-bottom: 8px;
 }
 
-.invoice-container .footer {
-  margin-top: 50px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-muted);
-  border-top: 1px solid #eee;
-  padding-top: 20px;
+.sig-name {
+  font-weight: 700;
+  color: #1e293b;
 }
 
 /* Responsive Invoice Fixes */

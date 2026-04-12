@@ -277,6 +277,22 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("sidebarOverlay")
     .addEventListener("click", toggleSidebar);
 
+  // Password toggle logic
+  const toggleBtn = document.getElementById("togglePassword");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", function() {
+      const passwordInput = document.getElementById("password");
+      const icon = this.querySelector("i");
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        icon.classList.replace("fa-eye", "fa-eye-slash");
+      } else {
+        passwordInput.type = "password";
+        icon.classList.replace("fa-eye-slash", "fa-eye");
+      }
+    });
+  }
+
   document.querySelectorAll(".close-modal, .btn[data-modal]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const modalId = e.currentTarget.dataset.modal;
@@ -685,7 +701,7 @@ async function updateDashboardData() {
     tableBody.innerHTML = recentOrders
       .map(
         (order) =>
-          `<tr><td>#${order.id}</td><td>${new Date(
+          `<tr><td>${order.id}</td><td>${new Date(
             order.date_in
           ).toLocaleDateString()}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
             order.status
@@ -789,7 +805,7 @@ async function loadWorkOrders(page = 1, search = "") {
       .map(
         (order) =>
           `<tr>
-            <td>#${order.id}</td>
+            <td>${order.id}</td>
             <td>${new Date(order.date_in).toLocaleDateString("id-ID")}</td>
             <td>${order.customers?.name || "-"}</td>
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
@@ -802,12 +818,15 @@ async function loadWorkOrders(page = 1, search = "") {
             <td>${formatCurrency(order.total_cost)}</td>
             <td>
               <div style="display: flex; gap: 5px;">
-                <button class="btn btn-sm" onclick="showInvoiceModal(${
+                <button class="btn btn-sm btn-secondary" onclick="showInvoiceModal(${
                   order.id
-                })"><i class="fas fa-eye"></i></button>
-                <button class="btn btn-sm" onclick="showWorkOrderModal(${
+                })" title="Invoice"><i class="fas fa-file-invoice"></i></button>
+                <button class="btn btn-sm btn-success" onclick="openDirectWhatsApp(${
                   order.id
-                })"><i class="fas fa-edit"></i></button>
+                })" title="Kirim WA"><i class="fab fa-whatsapp"></i></button>
+                <button class="btn btn-sm btn-secondary" onclick="showWorkOrderModal(${
+                  order.id
+                })" title="Edit"><i class="fas fa-edit"></i></button>
               </div>
             </td>
           </tr>`
@@ -1541,90 +1560,86 @@ async function showInvoiceModal(orderId) {
     const html = `
       <div class="invoice-container">
         <div class="invoice-header">
-          <div class="company-name">${companyName}</div>
-          <div class="company-address">${companyAddress}</div>
-          <div class="company-phone">Telp: ${companyPhone}</div>
-          <h1 class="invoice-title">INVOICE</h1>
-          <div class="invoice-no">No: INV-${order.id}-${new Date()
-      .toISOString()
-      .slice(0, 10)
-      .replace(/-/g, "")}</div>
-        </div>
-        
-        <div class="invoice-details">
-          <div>
-            <div class="detail-row"><span class="detail-label">Work Order ID:</span> <span>#${
-              order.id
-            }</span></div>
-            <div class="detail-row"><span class="detail-label">Plat Nomor:</span> <span>${
-              order.vehicles?.plate || "-"
-            }</span></div>
+          <div class="company-info">
+            <div class="company-name">${companyName}</div>
+            <div class="company-address">${companyAddress}</div>
+            <div class="company-phone">Telp/WA: ${companyPhone}</div>
           </div>
-          <div>
-            <div class="detail-row"><span class="detail-label">Tanggal:</span> <span>${new Date(
-              order.date_in
-            ).toLocaleDateString("id-ID")}</span></div>
-            <div class="detail-row"><span class="detail-label">Pelanggan:</span> <span>${
-              order.customers?.name || "-"
-            }</span></div>
+          <div class="invoice-title-area">
+            <h1>INVOICE</h1>
+            <div class="invoice-no">INV-${order.id}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}</div>
           </div>
         </div>
         
-        <div class="invoice-complaint">
-          <h3>Keluhan</h3>
-          <p style="margin: 0; padding: 15px; background: #f8fafc; border-radius: 8px; font-size: 14px; margin-bottom: 20px;">${
-            order.complaint || "-"
-          }</p>
+        <div class="invoice-details-grid">
+          <div class="info-block">
+            <h4>Ditujukan Kepada</h4>
+            <div class="info-content">${order.customers?.name || "-"}</div>
+            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">${order.customers?.phone || ""}</div>
+          </div>
+          <div class="info-block">
+            <h4>Detail Pengerjaan</h4>
+            <div class="info-content">ID WO: ${order.id}</div>
+            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Tgl: ${new Date(order.date_in).toLocaleDateString("id-ID")}</div>
+          </div>
+        </div>
+        
+        <div class="info-block" style="margin-bottom: 30px;">
+          <h4>Keluhan / Deskripsi</h4>
+          <div style="font-size: 14px; background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary);">${order.complaint || "-"}</div>
         </div>
 
-        ${
-          order.notes
-            ? `
-        <div class="invoice-spareparts">
-          <h3>Rincian Sparepart</h3>
-          <p style="margin: 0; padding: 15px; background: #fdf5e6; border-radius: 8px; font-size: 14px; white-space: pre-line; border-left: 4px solid #f59e0b;">${order.notes}</p>
+        ${order.notes ? `
+        <div class="info-block" style="margin-bottom: 30px;">
+          <h4>Rincian Sparepart</h4>
+          <div style="font-size: 14px; background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; white-space: pre-line;">${order.notes}</div>
         </div>
-        `
-            : ""
-        }
+        ` : ""}
         
-        <table class="table" style="margin: 30px 0;">
+        <table class="invoice-table">
           <thead>
             <tr>
-              <th>Deskripsi</th>
-              <th style="text-align: right;">Total</th>
+              <th>Deskripsi Item</th>
+              <th style="text-align: right;">Total Biaya</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>Total Biaya Servis & Sparepart</td>
-              <td style="text-align: right;">${formatCurrency(
-                order.total_cost
-              )}</td>
+              <td>Biaya Jasa & Penggantian Suku Cadang Terkait</td>
+              <td style="text-align: right; font-weight: 700;">${formatCurrency(order.total_cost)}</td>
             </tr>
           </tbody>
         </table>
         
-        <div class="total">
-          Total Akhir: ${formatCurrency(order.total_cost)}
-          <div style="font-size: 13px; color: var(--secondary); font-weight: normal; margin-top: 5px;">
-            Status Pembayaran: ${order.payment_status}
+        <div class="invoice-summary">
+          <div class="summary-box">
+            <div class="summary-row">
+              <span>Status Pembayaran</span>
+              <span style="font-weight: 700;">${order.payment_status}</span>
+            </div>
+            <div class="summary-row grand-total">
+              <span>Total Akhir</span>
+              <span>${formatCurrency(order.total_cost)}</span>
+            </div>
           </div>
         </div>
         
-        <div class="signature">
-          <div class="signature-box">
-            <div>Hormat Kami,</div>
-            <div class="signature-line"></div>
-            <div>${companyName}</div>
-          </div>
-          <div class="signature-box">
+        <div class="signature-section">
+          <div class="sig-box">
             <div>Pelanggan,</div>
-            <div class="signature-line"></div>
-            <div>${order.customers?.name || "Nama Terang"}</div>
+            <div class="sig-line"></div>
+            <div class="sig-name">${order.customers?.name || "Nama Terang"}</div>
+          </div>
+          <div class="sig-box">
+            <div>Admin Bengkel,</div>
+            <div class="sig-line"></div>
+            <div class="sig-name">${companyName}</div>
           </div>
         </div>
-        
+
+        <div class="invoice-footer">
+          Terima kasih telah mempercayakan kendaraan Anda kepada kami.<br>
+          Simpan invoice ini sebagai bukti servis yang sah.
         </div>
       </div>
     `;
@@ -1647,6 +1662,35 @@ function printInvoice() {
 
 function downloadInvoice() {
   showNotification("Fitur download PDF dalam pengembangan", "info");
+}
+
+async function openDirectWhatsApp(orderId) {
+  try {
+    const { data: order, error } = await db
+      .from("work_orders")
+      .select("*, customers(*)")
+      .eq("id", orderId)
+      .single();
+
+    if (error) throw error;
+
+    let phone = order.customers?.phone || "";
+    if (phone.startsWith("0")) {
+      phone = "62" + phone.substring(1);
+    } else if (phone && !phone.startsWith("62")) {
+      phone = "62" + phone;
+    }
+
+    const message = encodeURIComponent(
+      `Halo *${order.customers?.name || "Pelanggan"}*,\n\nBerikut adalah update pengerjaan kendaraan Anda dengan ID WO: *${order.id}*.\nStatus saat ini: *${order.status}*.\n\nTerima kasih.`
+    );
+
+    const waUrl = `https://wa.me/${phone}?text=${message}`;
+    window.open(waUrl, "_blank");
+  } catch (err) {
+    console.error("Error direct WA:", err);
+    showNotification("Gagal mengirim pesan WhatsApp", "error");
+  }
 }
 
 async function sendInvoiceToWhatsApp() {
