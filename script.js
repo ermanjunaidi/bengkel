@@ -1675,28 +1675,16 @@ async function openDirectWhatsApp(orderId) {
 
     if (error) throw error;
 
-    let phone = String(order.customers?.phone || "").replace(/\D/g, "");
-    if (phone.startsWith("0")) {
-      phone = "62" + phone.substring(1);
-    } else if (phone && !phone.startsWith("62")) {
-      phone = "62" + phone;
-    }
-
-    if (!phone) {
-      showNotification("Nomor telepon tidak valid", "warning");
-      return;
-    }
-
     const message = encodeURIComponent(
-      `Halo *${order.customers?.name || "Pelanggan"}*,\n\nBerikut adalah update pengerjaan kendaraan Anda dengan ID WO: *${order.id}*.\nStatus saat ini: *${order.status}*.\n\nTerima kasih.`
+      `Halo, berikut adalah update pengerjaan kendaraan ID WO: ${order.id}.\nStatus saat ini: ${order.status}.`
     );
 
-    const waUrl = `https://wa.me/${phone}?text=${message}`;
+    const waUrl = `https://wa.me/?text=${message}`;
     const newWindow = window.open(waUrl, "_blank");
     if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-       // Popup blocker
        window.location.href = waUrl;
     }
+    showNotification("WhatsApp terbuka, silakan cari kontak tujuan", "info");
   } catch (err) {
     console.error("Error direct WA:", err);
     showNotification("Gagal mengirim pesan WhatsApp", "error");
@@ -1726,41 +1714,27 @@ async function sendInvoiceToWhatsApp() {
 
     // Download file
     const link = document.createElement("a");
-    link.download = `Invoice-${currentWorkOrderId}.png`;
+    const fileName = `Invoice-${currentWorkOrderId}.png`;
+    link.download = fileName;
     link.href = canvas.toDataURL("image/png");
     link.click();
 
     showNotification("Gambar berhasil diunduh!", "success");
 
-    // Persiapkan nomor WA
-    let phone = String(currentOrderData.customers?.phone || "").replace(/\D/g, "");
-    if (phone.startsWith("0")) {
-      phone = "62" + phone.substring(1);
-    } else if (phone && !phone.startsWith("62")) {
-      phone = "62" + phone;
-    }
-
-    if (!phone) {
-      showNotification("Nomor telepon pelanggan tidak ditemukan", "warning");
-      return;
-    }
-
     const message = encodeURIComponent(
-      `Halo *${currentOrderData.customers?.name || "Pelanggan"}*,\n\nBerikut adalah nota/invoice untuk pengerjaan ID: *${currentWorkOrderId}*.\n\nSilakan lampirkan gambar yang baru saja terunduh.\n\nTerima kasih.`
+      `Halo, berikut adalah nota/invoice untuk pengerjaan ID: ${currentWorkOrderId}.\n\n(Silakan lampirkan gambar ${fileName} yang baru saja terunduh)`
     );
 
     setTimeout(() => {
-      const waUrl = `https://wa.me/${phone}?text=${message}`;
+      // Buka WA tanpa nomor agar user bisa cari kontak manual
+      const waUrl = `https://wa.me/?text=${message}`;
       const newWindow = window.open(waUrl, "_blank");
       
       if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-         // Popup blocker or mobile constraint
-         showNotification("Membuka WhatsApp...", "info");
          window.location.href = waUrl;
-      } else {
-         showNotification("Silakan PASTE gambar ke WhatsApp", "info");
       }
-    }, 1500);
+      showNotification("WhatsApp terbuka, silakan cari kontak dan PASTE gambar", "info");
+    }, 1000);
 
   } catch (error) {
     console.error("Error sending WhatsApp:", error);
