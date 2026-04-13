@@ -835,6 +835,11 @@ async function loadWorkOrders(page = 1, search = "") {
                 <button class="btn btn-sm btn-secondary" onclick="showWorkOrderModal(${
                   order.id
                 })" title="Edit"><i class="fas fa-edit"></i></button>
+                ${
+                  checkPermission("workorders", "delete")
+                    ? `<button class="btn btn-sm text-danger" onclick="deleteWorkOrder(${order.id})" title="Hapus"><i class="fas fa-trash"></i></button>`
+                    : ""
+                }
               </div>
             </td>
           </tr>`
@@ -2552,6 +2557,41 @@ async function deleteCustomer(id) {
   } catch (err) {
     showNotification("Gagal menghapus pelanggan", "error");
     console.error("Delete Customer error:", err);
+  }
+}
+
+async function deleteWorkOrder(id) {
+  if (!checkPermission("workorders", "delete")) {
+    showNotification("Anda tidak memiliki izin untuk menghapus work order", "warning");
+    return;
+  }
+
+  if (
+    !confirm(
+      `Apakah Anda yakin ingin menghapus Work Order #${id}? Tindakan ini tidak dapat dibatalkan.`
+    )
+  ) {
+    return;
+  }
+
+  try {
+    const { error } = await db.from("work_orders").delete().eq("id", id);
+    if (error) throw error;
+
+    showNotification("Work Order berhasil dihapus", "success");
+
+    const currentPageHasSingleRow =
+      document.querySelectorAll("#workOrdersTable tr").length === 1 &&
+      paginationState.workorders.page > 1;
+
+    const targetPage = currentPageHasSingleRow
+      ? paginationState.workorders.page - 1
+      : paginationState.workorders.page;
+
+    await loadWorkOrders(targetPage, paginationState.workorders.search);
+  } catch (err) {
+    showNotification("Gagal menghapus work order", "error");
+    console.error("Delete Work Order error:", err);
   }
 }
 

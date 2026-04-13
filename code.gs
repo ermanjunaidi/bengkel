@@ -427,11 +427,25 @@ function deleteRows_(table, filters) {
     if (!matchesFilters_(rows[i], filters) || !matchesOrFilters_(rows[i], [])) {
       continue;
     }
+    if (table === "work_orders") {
+      deleteRelatedTransactions_(rows[i].id);
+    }
     deleted.push(rows[i]);
     sheet.deleteRow(i + 2);
   }
 
   return { success: true, data: enrichRows_(table, deleted), count: deleted.length };
+}
+
+function deleteRelatedTransactions_(workOrderId) {
+  var sheet = getSheet_("transactions");
+  var rows = readRows_("transactions");
+
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (String(rows[i].work_order_id) === String(workOrderId)) {
+      sheet.deleteRow(i + 2);
+    }
+  }
 }
 
 function readRows_(table) {
