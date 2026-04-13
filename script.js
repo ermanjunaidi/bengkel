@@ -307,6 +307,13 @@ function formatCurrency(amount) {
   return "Rp " + (parseFloat(amount) || 0).toLocaleString("id-ID");
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("id-ID");
+}
+
 function maskCurrency(el) {
   let value = el.value.replace(/\D/g, "");
   el.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -702,9 +709,9 @@ async function updateDashboardData() {
     tableBody.innerHTML = recentOrders
       .map(
         (order) =>
-          `<tr><td>${order.id}</td><td>${new Date(
+          `<tr><td>${order.id}</td><td>${formatDate(
             order.date_in
-          ).toLocaleDateString()}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
+          )}</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
             order.status
           }</span></td><td>${
             order.profiles?.full_name || "-"
@@ -791,7 +798,7 @@ async function loadWorkOrders(page = 1, search = "") {
       data: orders,
       count,
       error,
-    } = await query.order("created_at", { ascending: false }).range(from, to);
+    } = await query.order("id", { ascending: false }).range(from, to);
 
     if (error) throw error;
 
@@ -807,7 +814,7 @@ async function loadWorkOrders(page = 1, search = "") {
         (order) =>
           `<tr>
             <td>${order.id}</td>
-            <td>${new Date(order.date_in).toLocaleDateString("id-ID")}</td>
+            <td>${formatDate(order.date_in)}</td>
             <td>${order.customers?.name || "-"}</td>
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${
               order.complaint || ""
@@ -905,7 +912,7 @@ async function loadCustomers(page = 1, search = "") {
       data: customers,
       count,
       error,
-    } = await query.order("name", { ascending: true }).range(from, to);
+    } = await query.order("id", { ascending: false }).range(from, to);
 
     if (error) throw error;
 
@@ -925,9 +932,16 @@ async function loadCustomers(page = 1, search = "") {
             <td>${c.phone}</td>
             <td>${c.address || "-"}</td>
             <td>
-              <button class="btn btn-sm" onclick="showCustomerModal(${
-                c.id
-              })"><i class="fas fa-edit"></i></button>
+              <div style="display: flex; gap: 5px;">
+                <button class="btn btn-sm" onclick="showCustomerModal(${
+                  c.id
+                })"><i class="fas fa-edit"></i></button>
+                ${
+                  checkPermission("customers", "delete")
+                    ? `<button class="btn btn-sm text-danger" onclick="deleteCustomer(${c.id})"><i class="fas fa-trash"></i></button>`
+                    : ""
+                }
+              </div>
             </td>
           </tr>`
       )
@@ -1138,7 +1152,7 @@ async function generateFinancialReport() {
     if (startDate) query = query.gte("date_in", startDate);
     if (endDate) query = query.lte("date_in", endDate);
 
-    const { data: orders, error } = await query.order("date_in", {
+    const { data: orders, error } = await query.order("id", {
       ascending: false,
     });
 
@@ -2034,15 +2048,22 @@ function showNotification(message, type = "info") {
   }, 3500);
 }
 
-async function showWorkOrderModal(id = null) {
+async function showWorkOrderModal(id = null, skipReset = false) {
   const modalId = "workOrderModal";
   showModal(modalId);
   const form = document.getElementById("workOrderForm");
-  form.reset();
-  document.getElementById("woId").value = id || "";
-  document.getElementById("woModalTitle").textContent = id
-    ? "Edit Work Order #" + id
-    : "Work Order Baru";
+  
+  // Save current selections if skipReset is true
+  const currentCust = skipReset ? document.getElementById("woCustomer").value : null;
+  const currentTech = skipReset ? document.getElementById("woTeknisi").value : null;
+
+  if (!skipReset) {
+    form.reset();
+    document.getElementById("woId").value = id || "";
+    document.getElementById("woModalTitle").textContent = id
+      ? "Edit Work Order #" + id
+      : "Work Order Baru";
+  }
 
   const custSelect = document.getElementById("woCustomer");
   const techSelect = document.getElementById("woTeknisi");
@@ -2065,7 +2086,23 @@ async function showWorkOrderModal(id = null) {
 
   populateDropdowns(customersCache, techniciansCache);
 
-  if (id) {
+  // Restore selections if skipReset is true
+  if (skipReset) {
+    if (currentCust) {
+      custSelect.value = currentCust;
+      if (typeof $ !== "undefined" && $.fn.select2) {
+        $(custSelect).trigger("change");
+      }
+    }
+    if (currentTech) {
+      techSelect.value = currentTech;
+      if (typeof $ !== "undefined" && $.fn.select2) {
+        $(techSelect).trigger("change");
+      }
+    }
+  }
+
+  if (id && !skipReset) {
     try {
       const { data: order, error } = await db
         .from("work_orders")
@@ -2242,20 +2279,32 @@ async function submitCustomer() {
 
   try {
     const data = { name: nama, phone: telepon, address: alamat };
+    let savedCustomer = null;
+
     if (id) {
       const { error } = await db.from("customers").update(data).eq("id", id);
       if (error) throw error;
       showNotification("Pelanggan berhasil diupdate!", "success");
     } else {
-      const { error } = await db.from("customers").insert(data);
+      const { data: inserted, error } = await db.from("customers").insert(data);
       if (error) throw error;
+      if (inserted && inserted.length > 0) savedCustomer = inserted[0];
       showNotification("Pelanggan berhasil disimpan!", "success");
     }
 
     closeModal("customerModal");
     if (document.getElementById("workOrderModal").classList.contains("show")) {
       customersCache = null;
-      showWorkOrderModal(document.getElementById("woId").value || null);
+      // Refresh dropdowns without resetting form
+      await showWorkOrderModal(document.getElementById("woId").value || null, true);
+      // Select the newly added customer if any
+      if (savedCustomer) {
+        const custSelect = document.getElementById("woCustomer");
+        custSelect.value = savedCustomer.id;
+        if (typeof $ !== "undefined" && $.fn.select2) {
+          $(custSelect).trigger("change");
+        }
+      }
     } else {
       loadCustomers();
     }
@@ -2396,7 +2445,7 @@ async function loadFinancialData(page = 1) {
     const { data: orders, count, error } = await db
       .from("work_orders")
       .select("*, customers(name)", { count: "exact" })
-      .order("date_in", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, to);
 
     if (error) throw error;
@@ -2404,9 +2453,9 @@ async function loadFinancialData(page = 1) {
     targetTable.innerHTML = orders
       .map(
         (order) =>
-          `<tr><td>${order.id}</td><td>${new Date(
+          `<tr><td>${order.id}</td><td>${formatDate(
             order.date_in
-          ).toLocaleDateString()}</td><td>${
+          )}</td><td>${
             order.customers?.name || "-"
           }</td><td>Servis</td><td><span class="status-badge status-${order.status.toLowerCase()}">${
             order.status
@@ -2436,7 +2485,7 @@ async function exportFullReport() {
       .select(
         "*, customers(name), profiles!work_orders_technician_id_fkey(full_name)"
       )
-      .order("date_in", { ascending: false });
+      .order("id", { ascending: true });
 
     if (error) throw error;
 
@@ -2472,6 +2521,37 @@ async function exportFullReport() {
   } catch (err) {
     showNotification("Gagal mengekspor laporan", "error");
     console.error("Export error:", err);
+  }
+}
+
+async function deleteCustomer(id) {
+  if (!confirm("Apakah Anda yakin ingin menghapus pelanggan ini?")) return;
+
+  try {
+    // Check if customer has work orders
+    const { data: orders } = await db
+      .from("work_orders")
+      .select("id")
+      .eq("customer_id", id)
+      .limit(1);
+
+    if (orders && orders.length > 0) {
+      showNotification(
+        "Tidak dapat menghapus pelanggan yang memiliki riwayat work order.",
+        "warning"
+      );
+      return;
+    }
+
+    const { error } = await db.from("customers").delete().eq("id", id);
+    if (error) throw error;
+
+    showNotification("Pelanggan berhasil dihapus", "success");
+    customersCache = null;
+    loadCustomers(paginationState.customers.page, paginationState.customers.search);
+  } catch (err) {
+    showNotification("Gagal menghapus pelanggan", "error");
+    console.error("Delete Customer error:", err);
   }
 }
 

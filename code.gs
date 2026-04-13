@@ -331,6 +331,8 @@ function insertRows_(table, data) {
       record.status = record.status || "Menunggu";
       record.payment_status = record.payment_status || "Belum Lunas";
       record.total_cost = toNumber_(record.total_cost);
+      record.date_in = record.date_in || new Date().toISOString();
+      record.created_at = record.created_at || new Date().toISOString();
     }
     if (table === "posts") {
       record.created_at = record.created_at || new Date().toISOString();
