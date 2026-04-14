@@ -5,21 +5,21 @@ const GAS_API_URL =
 async function apiRequest(payload) {
   if (!GAS_API_URL) {
     throw new Error(
-      "API URL belum diatur. Periksa file index.html dan isi window.GAS_API_URL dengan URL Google Apps Script yang benar."
-    );
-  }
-  
-  if (GAS_API_URL.includes("YOUR_DEPLOYED")) {
-    throw new Error(
-      "URL Google Apps Script belum diatur. Ganti placeholder di index.html dengan URL deployment yang sebenarnya."
+      "API URL belum diatur. Periksa file index.html dan isi window.GAS_API_URL dengan URL backend yang benar."
     );
   }
 
   console.log("API Request:", { url: GAS_API_URL, payload });
 
+  // Determine if using local backend or Google Apps Script
+  const isLocalBackend = GAS_API_URL.includes("localhost") || GAS_API_URL.includes("127.0.0.1");
+  
   const response = await fetch(GAS_API_URL, {
     method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    headers: { 
+      "Content-Type": "application/json;charset=utf-8",
+      "Accept": "application/json"
+    },
     body: JSON.stringify({
       action: "query",
       ...payload,
@@ -27,13 +27,24 @@ async function apiRequest(payload) {
     }),
   });
 
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
   const result = await response.json();
   console.log("API Response:", result);
 
-  if (!result.success) {
-    throw new Error(result.error || "Request API gagal");
+  // Handle different response formats
+  if (isLocalBackend) {
+    // Local backend returns data directly
+    return result;
+  } else {
+    // Google Apps Script wraps response in {success, data, error}
+    if (!result.success) {
+      throw new Error(result.error || "Request API gagal");
+    }
+    return result;
   }
-  return result;
 }
 
 class RestQueryBuilder {
@@ -345,6 +356,45 @@ function transformImageUrl(url) {
   }
 
   return directUrl;
+}
+
+function showNotification(message, type = "info") {
+  // Silent filter for "processing" type messages to reduce clutter
+  const silentMessages = ["Sedang", "Memproses", "Menyiapkan", "Memuat"];
+  if (type === "info" && silentMessages.some((m) => message.includes(m))) {
+    console.log("Notification suppressed:", message);
+    return;
+  }
+
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+
+  const icons = {
+    success: '<i class="fas fa-check-circle text-success"></i>',
+    error: '<i class="fas fa-exclamation-circle text-danger"></i>',
+    info: '<i class="fas fa-info-circle text-info"></i>',
+    warning: '<i class="fas fa-exclamation-triangle text-warning"></i>',
+  };
+
+  toast.innerHTML = `
+    <div class="toast-icon">${icons[type] || icons.info}</div>
+    <div class="toast-content">${message}</div>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.add("removing");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
 }
 
 function renderPaginationUI(totalCount, currentPage, onPageChange) {
@@ -2049,46 +2099,6 @@ async function updateProfile() {
     showNotification("Gagal update profile", "error");
     console.error("Update Profile error:", error);
   }
-}
-
-
-function showNotification(message, type = "info") {
-  // Silent filter for "processing" type messages to reduce clutter
-  const silentMessages = ["Sedang", "Memproses", "Menyiapkan", "Memuat"];
-  if (type === "info" && silentMessages.some((m) => message.includes(m))) {
-    console.log("Notification suppressed:", message);
-    return;
-  }
-
-  let container = document.querySelector(".toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-
-  const icons = {
-    success: '<i class="fas fa-check-circle text-success"></i>',
-    error: '<i class="fas fa-exclamation-circle text-danger"></i>',
-    info: '<i class="fas fa-info-circle text-info"></i>',
-    warning: '<i class="fas fa-exclamation-triangle text-warning"></i>',
-  };
-
-  toast.innerHTML = `
-    <div class="toast-icon">${icons[type] || icons.info}</div>
-    <div class="toast-content">${message}</div>
-  `;
-
-  container.appendChild(toast);
-
-  // Auto remove
-  setTimeout(() => {
-    toast.classList.add("removing");
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
 }
 
 async function showWorkOrderModal(id = null, skipReset = false) {
