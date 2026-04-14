@@ -1,0 +1,10 @@
+{
+  "name": "bengkel-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "cd frontend && npm install",
+    "backend": "cd backend && go run cmd/server/main.go",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "npx concurrently --kill-others \"npm run backend\" \"npm run frontend\""
+  }
+}

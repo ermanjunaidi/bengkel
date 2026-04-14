@@ -274,10 +274,10 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", toggleSidebar);
   document
     .getElementById("closeSidebar")
-    .addEventListener("click", toggleSidebar);
+    .addEventListener("click", closeSidebar);
   document
     .getElementById("sidebarOverlay")
-    .addEventListener("click", toggleSidebar);
+    .addEventListener("click", closeSidebar);
 
   // Password toggle logic
   const toggleBtn = document.getElementById("togglePassword");
@@ -406,8 +406,37 @@ function closeModal(modalId) {
 function toggleSidebar() {
   const sidebar = document.getElementById("sidebar");
   const overlay = document.getElementById("sidebarOverlay");
-  sidebar.classList.toggle("show");
-  overlay.classList.toggle("show");
+  const mainContent = document.querySelector(".main-content");
+  
+  // Toggle collapsed class on sidebar
+  sidebar.classList.toggle("collapsed");
+  
+  // Toggle expanded class on main content
+  if (mainContent) {
+    mainContent.classList.toggle("expanded");
+  }
+  
+  // Handle overlay for mobile
+  if (window.innerWidth <= 992) {
+    sidebar.classList.toggle("show");
+    overlay.classList.toggle("show");
+  }
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const mainContent = document.querySelector(".main-content");
+  
+  // Remove show class for mobile
+  sidebar.classList.remove("show");
+  overlay.classList.remove("show");
+  
+  // Add collapsed class for desktop
+  sidebar.classList.add("collapsed");
+  if (mainContent) {
+    mainContent.classList.add("expanded");
+  }
 }
 
 async function handleLogin(e) {
@@ -585,13 +614,22 @@ function setupMenu() {
 async function loadPage(page) {
   currentPage = page;
 
-  // Close sidebar on mobile after selecting menu
+  // Close sidebar after selecting menu
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const mainContent = document.querySelector(".main-content");
+  
   if (window.innerWidth <= 992) {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebarOverlay");
+    // Mobile: remove show class
     if (sidebar.classList.contains("show")) {
       sidebar.classList.remove("show");
       overlay.classList.remove("show");
+    }
+  } else {
+    // Desktop: keep sidebar collapsed after navigation
+    sidebar.classList.add("collapsed");
+    if (mainContent) {
+      mainContent.classList.add("expanded");
     }
   }
 
